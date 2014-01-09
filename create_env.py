@@ -115,7 +115,7 @@ def create_env(organization, agent=None):
 # Add services
     key_service = organization.service(type='builtin:cobalt_secure_store', name='Keystore'+zone, zone=agent)
     print "Keystore service %s initialized" % key_service.name
-    wf_service = organization.service(type='builtin:workflow_service', name='Workflow'+zone, parameters= {'configuration.policies': '{}'}, zone=agent)
+    wf_service = organization.service(type='builtin:workflow_service', name='Workflow'+zone, zone=agent)
     print "Workflow service %s initialized" % wf_service.name
     shared_service = organization.service(type='builtin:shared_instances_catalog', name='BaseTestSharedService'+zone, parameters= {'configuration.shared-instances': '{}'}, zone=agent)
     print "Shared instance service %s initialized" % shared_service.name

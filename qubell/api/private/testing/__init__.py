@@ -164,7 +164,7 @@ class BaseTestCase(unittest.TestCase):
             "organization": {"name": organization},
             "services": [
                 {"type": 'builtin:cobalt_secure_store', "name": 'Keystore', "parameters": "{}"},
-                {"type": 'builtin:workflow_service', "name": 'Workflow', "parameters": {'configuration.policies': '{}'}}
+                {"type": 'builtin:workflow_service', "name": 'Workflow', "parameters": "{}"}
             ],
             "instances": [],
             "cloudAccounts": [{
@@ -288,14 +288,12 @@ class SandBox(object):
         return self.organization
 
     def clean(self, timeout=3):
+        # TODO: It's not working right now. refactor
         log.info("cleaning sandbox...")
-        for instanceData in self.sandbox['instances']:
-            instance = Instance(context=self.platform.context, id=instanceData["id"])
-            instance.destroy()
-            if not instance.destroyed(timeout):
-                log.error(
-                    "Instance was not destroyed properly {0}: {1}".format(instanceData["id"], instanceData["name"])
-                )
+        for app in self.sandbox['applications']:
+            application = self.organization.get_application(app["id"])
+            application.clean(timeout)
+            application.delete()
         log.info("sandbox cleaned")
 
     def __check_environment_name(self, name):

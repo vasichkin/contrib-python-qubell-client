@@ -159,9 +159,8 @@ class Organization(object):
     def create_keystore_service(self, name='generated-keystore', parameters={}, zone=None):
         return self.create_service(name=name, type='builtin:cobalt_secure_store', parameters=parameters, zone=zone)
 
-    def create_workflow_service(self, name='generated-workflow', policies={}, zone=None):
-        parameters = {'configuration.policies': json.dumps(policies)}
-        return self.create_service(name=name, type='builtin:workflow_service', parameters=parameters, zone=zone)
+    def create_workflow_service(self, name='generated-workflow', zone=None):
+        return self.create_service(name=name, type='builtin:workflow_service', zone=zone)
 
     def create_shared_service(self, name='generated-shared', instances={}, zone=None):
         parameters = {'configuration.shared-instances': json.dumps(instances)}
