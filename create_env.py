@@ -55,7 +55,7 @@ credentials = os.environ.get('JCLOUDS_CREDENTIALS')
 __author__ = "Vasyl Khomenko"
 __copyright__ = "Copyright 2013, Qubell.com"
 __license__ = "Apache"
-__version__ = "1.0.11"
+__version__ = "1.0.13"
 __email__ = "vkhomenko@qubell.com"
 
 

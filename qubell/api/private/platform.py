@@ -16,7 +16,7 @@
 __author__ = "Vasyl Khomenko"
 __copyright__ = "Copyright 2013, Qubell.com"
 __license__ = "Apache"
-__version__ = "1.0.11"
+__version__ = "1.0.13"
 __email__ = "vkhomenko@qubell.com"
 
 import logging as log
@@ -121,3 +121,31 @@ class Auth(object):
 
         # TODO: parse tenant to generate api url
         self.api = tenant
+
+
+import warnings
+import functools
+
+warnings.simplefilter('always', DeprecationWarning)
+
+
+def deprecated(func, msg=None):
+    """
+    A decorator which can be used to mark functions
+    as deprecated.It will result in a deprecation warning being shown
+    when the function is used.
+    """
+
+    message = msg or "Use of deprecated function '{}`.".format(func.__name__)
+
+    @functools.wraps(func)
+    def wrapper_func(*args, **kwargs):
+        warnings.warn(message, DeprecationWarning, stacklevel=2)
+        return func(*args, **kwargs)
+    return wrapper_func
+
+
+@deprecated
+class Context(Auth):
+    def __init__(self, user, password, api):
+        super(Context, self).__init__(user, password, api)

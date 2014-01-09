@@ -23,7 +23,7 @@ from qubell.api.private.manifest import Manifest
 __author__ = "Vasyl Khomenko"
 __copyright__ = "Copyright 2013, Qubell.com"
 __license__ = "Apache"
-__version__ = "1.0.11"
+__version__ = "1.0.13"
 __email__ = "vkhomenko@qubell.com"
 
 class Constants(base.BaseTestCase):
