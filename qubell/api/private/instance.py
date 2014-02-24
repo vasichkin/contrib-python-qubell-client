@@ -12,6 +12,11 @@
 # implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import warnings
+from qubell import deprecated
+from qubell.api.private.environment import EnvironmentList
+from qubell.api.private.revision import Revision
+from qubell.api.private.service import ServiceMixin
 
 __author__ = "Vasyl Khomenko"
 __copyright__ = "Copyright 2013, Qubell.com"
@@ -20,35 +25,17 @@ __email__ = "vkhomenko@qubell.com"
 
 import logging as log
 import simplejson as json
-from qubell.api.tools import lazy
+import time
+from qubell.api.tools import lazyproperty
 
 from qubell.api.tools import waitForStatus as waitForStatus
 from qubell.api.private import exceptions
-from qubell.api.private.common import EntityList
+from qubell.api.private.common import QubellEntityList
 from qubell.api.provider.router import ROUTER as router
 
 DEAD_STATUS = ['Destroyed', 'Destroying']
 
-
-class Instances(EntityList):
-    def __init__(self, organization):
-        self.organization = organization
-        self.auth = self.organization.auth
-        self.organizationId = self.organization.organizationId
-        EntityList.__init__(self)
-
-    def _generate_object_list(self):
-        from qubell.api.private.instance import Instance
-
-        for app in self.organization.applications:
-            instances = app.json()['instances']
-            instances_alive = [ins for ins in instances if ins['status'] not in ['Destroyed', 'Destroying']]
-
-            for ins in instances_alive:
-                self.object_list.append(Instance(self.auth, app, id=ins['id']))
-
-
-class Instance(object):
+class Instance(ServiceMixin):
     """
     Base class for application instance. Manifest required.
     """
@@ -59,30 +46,47 @@ class Instance(object):
             ret[val['id']] = val['value']
         return ret
 
-    #@lazy
-    def __update(self):
-        info = self.json()
-        self.name = info['name']
-        #self.id = self.instanceId
-
-        self.environmentId = info['environmentId']
-        self.environment = self.organization.get_environment(self.environmentId)
-
-    def __init__(self, auth, application, **kwargs):
+    def __init__(self, organization, id=None, auth=None, **kwargs):
         if hasattr(self, 'instanceId'):
             log.warning("Instance reinitialized. Dangerous!")
-        self.auth = auth
-        self.application = application
-        self.applicationId = application.applicationId
-        self.organization = application.organization
-        self.organizationId = application.organizationId
-        self.defaultEnvironment = application.defaultEnvironment
+        if auth:
+            warnings.warn("'auth' param is deprecated, and will be removed soon", DeprecationWarning, stacklevel=2)
+            self.auth = auth
+        self.organization = organization
+        self.organizationId = organization.organizationId
         self.__dict__.update(kwargs)
-        if 'id' in kwargs:
-            self.instanceId = kwargs.get('id')
-            self.__update()
-        #elif 'name' in kwargs:
-        #    self.by_name(kwargs.get('name'))
+        self.__cached_json=None
+        if id:
+            self.instanceId = self.id = id
+            self.json()
+
+    @lazyproperty
+    def applicationId(self): return self.json()['applicationId']
+
+    @lazyproperty
+    def application(self):
+        return self.organization.applications[self.applicationId]
+
+    @lazyproperty
+    def environmentId(self): return self.json()['environmentId']
+
+    @lazyproperty
+    def environment(self): return self.organization.get_environment(self.environmentId)
+
+    @property
+    def status(self): return self.json()['status']
+
+    @property
+    def name(self): return self.json()['name']
+
+    @property
+    def return_values(self): return self.__parse(self.json()['returnValues'])
+
+    #alias
+    returnValues=return_values
+
+    @property
+    def parameters(self): return self.json()['revision']['parameters']
 
     def __getattr__(self, key):
         if key in ['instanceId',]:
@@ -90,32 +94,57 @@ class Instance(object):
         if key == 'ready':
             log.debug('Checking instance status')
             return self.ready()
-        # return same way old_public api does
-        if key in ['returnValues', ]:
-            return self.__parse(self.json()[key])
         else:
             log.debug('Getting instance attribute: %s' % key)
             return self.json()[key]
 
-    def json(self):
-        return router.get_instance(org_id=self.organizationId, instance_id=self.instanceId).json()
+    def fresh(self):
+        #todo: create decorator from this
+        if self.__cached_json is None:
+            return False
+        now = time.time()
+        elapsed = (now - self.__last_read_time) * 1000.0
+        return elapsed < 500
 
-    def create(self, revision=None, environment=None, name=None, parameters={}):
-        # Check we already has instance assosiated with us
-        if hasattr(self, 'instanceId'):
-            return self
-        if environment:
+    def json(self):
+        '''
+        return __cached_json, if accessed withing 300 ms.
+        This allows to optimize calls when many parameters of entity requires withing short time.
+        '''
+
+        if self.fresh():
+            log.debug("using cached instance")
+            return self.__cached_json
+        self.__last_read_time = time.time()
+        self.__cached_json = router.get_instance(org_id=self.organizationId, instance_id=self.instanceId).json()
+        return self.__cached_json
+
+    @staticmethod
+    def new(application=None, revision=None, environment=None, name=None, parameters=None, destroyInterval=None):
+        if not parameters: parameters = {}
+        if environment:  # if environment set, it overrides parameter
             parameters['environmentId'] = environment.environmentId
-        elif not 'environmentId' in parameters.keys():
-            parameters['environmentId'] = self.defaultEnvironment.environmentId
+        elif not 'environmentId' in parameters.keys():  # if not set and not in params, use default
+            parameters['environmentId'] = application.organization.defaultEnvironment.environmentId
         if name:
             parameters['instanceName'] = name
+        if destroyInterval:
+            parameters['destroyInterval'] = str(destroyInterval)
+        if revision:
+            parameters['revisionId'] = revision.revisionId
 
         data = json.dumps(parameters)
-        resp = router.post_organization_instance(org_id=self.organizationId, app_id=self.applicationId, data=data)
-        self.instanceId = resp.json()['id']
-        self.__update()
-        return self
+        resp = router.post_organization_instance(org_id=application.organizationId, app_id=application.applicationId, data=data)
+        return Instance(organization=application.organization, id=resp.json()['id'])
+
+    @deprecated("Use static method 'Instance.new' instead")
+    def create(self, application=None, revision=None, environment=None, name=None, parameters={}):
+        # Check we already has instance associated with us
+        if hasattr(self, 'instanceId'):
+            return self
+
+        assert application, "Api changed, define 'application' explicitly to create"
+        return Instance.new(application, revision, environment, name, parameters)
 
     def by_name(self, name):
         instance = self.organization.get_instance(name=name)
@@ -123,9 +152,9 @@ class Instance(object):
         return instance
 
     def by_id(self, id):
-        return self.organization.get_instance(id=id, application=self.application)
+        return Instance(id=id, organization=self.organization)
 
-    def ready(self, timeout=3):  # Shortcut for convinience. Temeout = 3 min (ask timeout*6 times every 10 sec)
+    def ready(self, timeout=3):  # Shortcut for convinience. Timeout = 3 min (ask timeout*6 times every 10 sec)
         return waitForStatus(instance=self, final='Running', accepted=['Launching', 'Requested', 'Executing', 'Unknown'], timeout=[timeout*6, 10, 1])
         # TODO: Unknown status  should be removed
 
@@ -141,23 +170,46 @@ class Instance(object):
     def get_manifest(self):
         return router.post_application_refresh(org_id=self.organizationId, app_id=self.applicationId).json()
 
-    def reconfigure(self, name='reconfigured', revision=None, environment=None,  parameters={}):
-        revisionId = revision or ''
+    def reconfigure(self, revision=None, parameters=None):
+        if not parameters: parameters = {}
+        if isinstance(revision, Revision):
+            revisionId = revision.revisionId
+        else:
+            revisionId = ''
         submodules = parameters.get('submodules', {})
 
         payload = json.dumps({
                    'parameters': parameters,
                    'submodules': submodules,
-                   'revisionId': revisionId,
-                   'instanceName': name})
+                   'revisionId': revisionId})
         resp = router.put_instance_configuration(org_id=self.organizationId, instance_id=self.instanceId, data=payload)
-        self.__update()
         return resp.json()
 
     def delete(self):
-        return self.destroy()
+        self.destroy()
+        #todo: remove, if destroyed
+        return True
 
     def destroy(self):
         log.info("Destroying")
-        resp = router.post_instance_workflow(org_id=self.organizationId, instance_id=self.instanceId, wf_name="destroy")
-        return resp.json()
+        return self.run_workflow("destroy")
+
+    @property
+    def serve_environments(self):
+        return EnvironmentList(lambda: self.json()["environments"], organization=self.organization)
+
+    def add_as_service(self, environments=None, environment_ids=None):
+        assert environments or environment_ids
+        if environments:
+            data = [env.environmentId for env in environments]
+        else:
+            assert isinstance(environment_ids, list)
+            data = environment_ids
+        router.post_instance_services(org_id=self.organizationId, instance_id=self.instanceId, data=json.dumps(data))
+
+    @property
+    def serviceId(self):
+        raise AttributeError("Service is instance reference now, use instanceId")
+
+class InstanceList(QubellEntityList):
+    base_clz = Instance

@@ -92,10 +92,6 @@ class Router(object):
     def post_application_refresh(self, org_id, app_id, cookies, data="{}", ctype=".json"): pass
 
     @play_auth
-    @route("GET /organizations/{org_id}/applications/{app_id}{ctype}")
-    def get_application_instances(self, org_id, app_id, cookies, data="{}", ctype=".json"): pass
-
-    @play_auth
     @route("POST /organizations/{org_id}/applications/{app_id}/manifests{ctype}")
     def post_application_manifest(self, org_id, app_id, data, files, cookies, ctype=".json"): pass
 
@@ -114,6 +110,10 @@ class Router(object):
 
     #Instance
     @play_auth
+    @route("GET /organizations/{org_id}/dashboard{ctype}")
+    def get_instances(self, org_id, cookies, ctype=".json"): pass
+
+    @play_auth
     @route("GET /organizations/{org_id}/instances/{instance_id}{ctype}")
     def get_instance(self, org_id, instance_id, cookies, ctype=".json"): pass
 
@@ -124,6 +124,10 @@ class Router(object):
     @play_auth
     @route("PUT /organizations/{org_id}/instances/{instance_id}/configuration{ctype}")
     def put_instance_configuration(self, org_id, instance_id, data, cookies, ctype=".json"): pass
+
+    @play_auth
+    @route("POST /organizations/{org_id}/environments/updateServiceEnvs/{instance_id}{ctype}")
+    def post_instance_services(self, org_id, instance_id, data, cookies, ctype=".json"): pass
 
     #Environment
     @play_auth
@@ -163,6 +167,15 @@ class Router(object):
     @play_auth
     @route("DELETE /organizations/{org_id}/providers/{prov_id}{ctype}")
     def delete_provider(self, org_id, prov_id, cookies, ctype=".json"): pass
+
+    #Service
+    @play_auth
+    @route("GET /organizations/{org_id}/services{ctype}")
+    def get_services(self, org_id, cookies, ctype=".json"): pass
+
+    @play_auth
+    @route("POST /organizations/{org_id}/services/{instance_id}/keys/generate{ctype}")
+    def post_service_generate(self, org_id, instance_id, cookies, data="{}", ctype=".json"): pass
 
 
 ROUTER = Router(os.environ.get('QUBELL_TENANT'))

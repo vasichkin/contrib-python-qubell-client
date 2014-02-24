@@ -42,7 +42,7 @@ class Revision(object):
         raise exceptions.NotFoundError('Cannot get revision property %s' % key)
 
     def json(self):
-        return router.delete_revision(org_id=self.organizationId, app_id=self.applicationId, rev_id=self.revisionId).json()
+        return router.get_revision(org_id=self.organizationId, app_id=self.applicationId, rev_id=self.revisionId).json()
 
     def delete(self):
         router.delete_revision(org_id=self.organizationId, app_id=self.applicationId, rev_id=self.revisionId)

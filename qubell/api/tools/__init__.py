@@ -91,7 +91,7 @@ def dump(node):
     from qubell.api.private.revision import Revision
     from qubell.api.private.provider import Provider
     from qubell.api.private.environment import Environment
-    from qubell.api.private.service import Service
+    from qubell.api.private.service import ServiceLegacy
     from qubell.api.private.zone import Zone
     from qubell.api.private.manifest import Manifest
 
@@ -107,7 +107,7 @@ def dump(node):
         Revision: ['auth', 'revisionId'],
         Provider: ['auth', 'providerId', 'organization'],
         Environment: ['auth', 'environmentId', 'organization'],
-        Service: ['auth', 'organization', 'zone', 'serviceId'],
+        ServiceLegacy: ['auth', 'organization', 'zone', 'serviceId'],
         Zone: ['auth', 'zoneId', 'organization'],
     }
 
@@ -137,6 +137,20 @@ def full_dump(org):
     """
     pass
 
+def lazyproperty(fn):
+    """
+    Decorator, reads property once, on first use.
+    :param fn:
+    :return:
+    """
+    attr_name = '_lazy_' + fn.__name__
+    @property
+    def _lazyprop(self):
+        if attr_name not in self.__dict__:  # don't use hasattr, due to call of __getattr__
+            setattr(self, attr_name, fn(self))
+        return getattr(self, attr_name)
+    return _lazyprop
+
 
 def lazy(func):
     def lazyfunc(*args, **kwargs):
@@ -147,4 +161,4 @@ def lazy(func):
 
 def is_bson_id(bson_id):
     id_pattern = "[A-Fa-f0-9]{24}"
-    return re.match(id_pattern, bson_id)
+    return re.match(id_pattern, str(bson_id))

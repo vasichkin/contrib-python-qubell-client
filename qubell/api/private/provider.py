@@ -24,7 +24,7 @@ from qubell.api.provider.router import ROUTER as router
 
 class Provider(object):
 
-    def __init__(self, auth, organization, id):
+    def __init__(self, organization, id, auth=None):
         self.auth = auth
         self.providerId = id
         self.organization = organization

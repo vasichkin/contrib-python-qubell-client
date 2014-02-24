@@ -36,7 +36,7 @@ class Service(Organization):
         my = self.json()
         self.name = my['name']
         self.type = my['typeId']
-        self.zone = my['zoneId']
+        #self.zone = my['zoneId']
 
     def __getattr__(self, key):
         resp = self.json()

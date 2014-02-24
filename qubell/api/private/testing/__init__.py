@@ -28,6 +28,7 @@ from functools import wraps
 
 from qubell.api.private.instance import Instance
 from qubell.api.private.manifest import Manifest
+from qubell.api.private.service import COBALT_SECURE_STORE_TYPE, WORKFLOW_SERVICE_TYPE
 
 
 from requests import api
@@ -174,14 +175,12 @@ class BaseTestCase(unittest.TestCase):
             for name, value in cls.environments.items():
                 key = str(re.sub("[^a-zA-Z0-9_]", "", name))
                 envs.update({key: value})
-                #servs.append({"type": 'builtin:cobalt_secure_store', "name": 'Credentials service for '+key, "parameters": "{}"})
-                #servs.append({"type": 'builtin:workflow_service', "name": 'Workflow service for '+key, "parameters": {'configuration.policies': '{}'}})
 
         else:
             envs = {"default": {}}
 
-        servs = [{"type": 'builtin:cobalt_secure_store', "name": 'Default credentials service', "parameters": "{}"},
-                 {"type": 'builtin:workflow_service', "name": 'Default workflow service', "parameters": {'configuration.policies': '{}'}}]
+        servs = [{"type": COBALT_SECURE_STORE_TYPE, "name": 'Default credentials service'},
+                 {"type": WORKFLOW_SERVICE_TYPE, "name": 'Default workflow service', "parameters": {'configuration.policies': '{}'}}]
 
         return {
             "organization": {"name": organization},
@@ -226,8 +225,8 @@ class BaseTestCase(unittest.TestCase):
         for app in cls.sandbox['applications']:
             for env in cls.sandbox['environments']:
                 if app.get('launch', True):
-                    environment_id = cls.organization.environment(name=env).id
-                    instance = cls.organization.application(name=app['name']).launch(environmentId=environment_id)
+                    environment = cls.organization.environment(name=env)
+                    instance = cls.organization.applications[app['name']].launch(environment=environment)
                     cls.instances.append(instance)
                     cls.sandbox.sandbox["instances"].append({
                         "id": instance.instanceId,
@@ -269,17 +268,18 @@ class SandBox(object):
 
     def __service(self, environment, service_data):
         service = self.organization.service(type=service_data["type"], name=service_data["name"],
-                                            parameters=(service_data["parameters"] or "{}"))
-
+                                            environment=environment,
+                                            parameters=(service_data.get("parameters", {})))
+        service.ready(1)
         environment.add_service(service)
-        if 'builtin:cobalt_secure_store' in service_data["type"]:
+        if COBALT_SECURE_STORE_TYPE is service_data["type"]:
             key_id = service.regenerate()['id']
             environment.add_policy({
                 "action": "provisionVms",
                 "parameter": "publicKeyId",
                 "value": key_id
             })
-        service_data["id"] = service.serviceId
+        service_data["id"] = service.instanceId
 
     def __cloud_account(self, environment, provider):
         cloud = self.organization.provider(parameters=provider, name=provider["name"])
@@ -317,13 +317,14 @@ class SandBox(object):
     def clean(self, timeout=10):
         log.info("cleaning sandbox...")
 
-        def destroy(instances):
+        def destroy(test_instances):
             return_instances = []
-            for instanceData in instances:
-                application = self.organization.get_application(instanceData['applicationId'])
-                instance = application.get_instance(instanceData['id'])
-                instance.destroy()
-                return_instances.append(instance)
+            instances = self.organization.instances
+            for instanceData in test_instances:
+                if instanceData['id'] in instances: #someone may removed it already
+                    instance = instances[instanceData['id']]
+                    instance.destroy()
+                    return_instances.append(instance)
             return return_instances
 
         for instance in destroy(self.sandbox['instances']):

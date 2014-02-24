@@ -60,11 +60,12 @@ class QubellPlatform(object):
         log.info("Picking organization: %s" % id)
         from qubell.api.private.organization import Organization
 
-        org = Organization(self.auth, id=id)
+        org = Organization(id)
         self.organizations.append(org)
         return org
 
     def get_or_create_organization(self, id=None, name=None):
+        """ Smart object. Will create organization, modify or pick one"""
         name = name or 'generated-org-name'
         if id: return self.get_organization(id)
         else:
@@ -75,10 +76,7 @@ class QubellPlatform(object):
             else:
                 return self.create_organization(name)
 
-    def organization(self, id=None, name=None):
-        """ Smart object. Will create organization, modify or pick one"""
-        # TODO: Modify if parameters differs
-        return self.get_or_create_organization(id, name)
+    organization = get_or_create_organization
 
     def organizations_json(self):
         resp = router.get_organizations()

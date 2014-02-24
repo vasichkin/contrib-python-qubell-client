@@ -61,7 +61,7 @@ class InstanceClassTest(BaseTestCase):
         self.assertEqual('This is default manifest', inst.returnValues['out.app_output'])
 
         # check we cannot create already created instance
-        my_inst = self.org.get_instance(application=self.app, id=inst.id).create()
+        my_inst = self.org.get_instance(application=self.app, id=inst.id).create(application=self.app)
         self.assertEqual(inst, my_inst)
 
         # clean
@@ -72,7 +72,7 @@ class InstanceClassTest(BaseTestCase):
         """ Check list_instances method contains our instance
         """
 
-        list = self.org.list_instances_json(application=self.app)
+        list = self.app.list_instances_json()
         self.assertTrue(self.ins.id in [x['id'] for x in list])
         list = self.org.list_instances_json()
         self.assertTrue(self.ins.id in [x['id'] for x in list])
@@ -93,9 +93,9 @@ class InstanceClassTest(BaseTestCase):
         """
         ins = self.ins
 
-        self.assertEqual(ins.id, Instance(auth=self.auth, application=self.app).by_name(ins.name).id)
-        self.assertEqual(ins.name, Instance(auth=self.auth, application=self.app).by_id(ins.id).name)
-        self.assertEqual(ins.name, Instance(auth=self.auth, application=self.app, id=ins.id).name)
+        self.assertEqual(ins.id, Instance(auth=self.auth, organization=self.org).by_name(ins.name).id)
+        self.assertEqual(ins.name, Instance(auth=self.auth, organization=self.org).by_id(ins.id).name)
+        self.assertEqual(ins.name, Instance(auth=self.auth, organization=self.org, id=ins.id).name)
 
     def test_get_or_launch_instance_method(self):
         ins = self.ins

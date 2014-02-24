@@ -37,7 +37,7 @@ def route(route_str):  # decorator param
             logfun = log.warn
         elif elapsed > 10000:
             logfun = log.error
-        logfun(' TimeTrace: {0} took {1} ms'.format(route_str, elapsed))
+        logfun(' Route Time: {0} took {1} ms'.format(route_str, elapsed))
 
 
     def wrapper(f):  # decorated function

@@ -22,19 +22,9 @@ from qubell.api.private import exceptions
 from qubell.api.private.common import QubellEntityList
 from qubell.api.provider.router import ROUTER as router
 
-class Zones(QubellEntityList):
-    def __init__(self, organization):
-        # TODO: That should be done by parent
-        QubellEntityList.__init__(self, organization)
-
-    def _generate_object_list(self):
-        for zone in self.organization.list_zones_json():
-            self.object_list.append(Zone(self.auth, self.organization, id=zone['id']))
-
 class Zone(object):
-    def __init__(self, auth, organization, id):
-        self.auth = auth
-        self.zoneId = id
+    def __init__(self, organization, id, auth=None):
+        self.zoneId = self.id = id
         self.organizationId = organization.organizationId
         self.organization = organization
         my = self.json()
@@ -52,3 +42,8 @@ class Zone(object):
         zone = [x for x in resp.json() if x['id'] == self.zoneId]
         if len(zone)>0:
             return zone[0]
+
+class ZoneList(QubellEntityList):
+    base_clz = Zone
+    def __init__(self, organization):
+        QubellEntityList.__init__(self, organization.list_zones_json, organization)
