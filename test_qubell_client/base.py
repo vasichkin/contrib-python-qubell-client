@@ -35,7 +35,7 @@ log.getLogger().setLevel(log.DEBUG)
 user = os.environ.get('QUBELL_USER')
 password = os.environ.get('QUBELL_PASSWORD')
 tenant = os.environ.get('QUBELL_TENANT')
-org = os.environ.get('QUBELL_ORGANIZATION')
+org = os.environ.get('QUBELL_ORGANIZATION', 'selfcheck_organization_name')
 prefix = os.environ.get('QUBELL_PREFIX')
 zone = os.environ.get('QUBELL_ZONE', '')
 new_env = os.environ.get('QUBELL_NEW')
@@ -67,13 +67,12 @@ class BaseTestCase(testtools.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.prefix = prefix or rand()
-        cls.context = Auth(user=user, password=password, tenant=tenant)
-        cls.auth = cls.context
-        cls.context_public = cls.context
+        #cls.auth = Auth(user=user, password=password, tenant=tenant)
+        #cls.context_public = cls.auth
 
     # Initialize platform and check access
-        cls.platform = QubellPlatform(cls.context)
-        assert cls.platform.authenticate()
+        cls.platform = QubellPlatform.connect(tenant, user, password)
+        #assert cls.platform.authenticate()
 
         ###cls.platform_public = QubellPlatformPublic(context=cls.context_public)
 

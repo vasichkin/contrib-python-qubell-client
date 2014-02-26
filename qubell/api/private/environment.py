@@ -13,6 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 from qubell import deprecated
+from qubell.api.tools import lazyproperty
 
 __author__ = "Vasyl Khomenko"
 __copyright__ = "Copyright 2013, Qubell.com"
@@ -23,31 +24,39 @@ import logging as log
 import simplejson as json
 
 from qubell.api.private import exceptions
-from qubell.api.private.common import QubellEntityList
+from qubell.api.private.common import QubellEntityList, Entity
 from qubell.api.provider.router import ROUTER as router
 
-class Environment(object):
-    def __update(self):
-        info = self.json()
-        self.name = info['name']
-        self.id = self.environmentId
-        self.zoneId = info['backends'][0]['id']
-        self.isDefault = info['isDefault']
+class Environment(Entity):
 
-    def __init__(self, organization, auth=None, **kwargs):
-        if 'environmentId' in locals():
-            log.warning("Environment reinitialized. Dangerous!")
-        self.services = []
+    def __init__(self, organization, id):
+        self.organization = organization
+        self.organizationId = self.organization.organizationId
+        self.environmentId = self.id = id
+
+        #todo: make as properties
         self.policies = []
         self.markers = []
         self.properties = []
         self.providers = []
-        self.auth = auth
-        self.organization = organization
-        self.organizationId = self.organization.organizationId
-        if 'id' in kwargs:
-            self.environmentId = kwargs.get('id')
-            self.__update()
+
+
+    @lazyproperty
+    def zoneId(self):
+        return self.json()['backend']
+
+    @lazyproperty
+    def services(self):
+        from qubell.api.private.instance import InstanceList
+        return InstanceList(list_json_method=self.list_services_json, organization=self)
+
+    @property
+    def name(self):
+        return self.json()['name']
+
+    @property
+    def isDefault(self):
+        return self.json()['isDefault']
 
     def __getattr__(self, key):
         resp = self.json()
@@ -55,18 +64,17 @@ class Environment(object):
             raise exceptions.NotFoundError('Cannot get property %s' % key)
         return resp[key] or False
 
-    def create(self, name, zone=None, default=False):
+    @staticmethod
+    def new(organization, name, zone=None, default=False):
         log.info("Creating environment: %s" % name)
         if not zone:
-            zone = self.organization.zone.zoneId
+            zone = organization.zone.zoneId
         data = {'isDefault': default,
                 'name': name,
                 'backend': zone,
-                'organizationId': self.organizationId}
-        resp = router.post_organization_environment(org_id=self.organizationId, data=json.dumps(data))
-        self.environmentId = resp.json()['id']
-        self.__update()
-        return self
+                'organizationId': organization.organizationId}
+        resp = router.post_organization_environment(org_id=organization.organizationId, data=json.dumps(data)).json()
+        return Environment(organization, id=resp['id'])
 
     def restore(self, config):
         for marker in config.pop('markers', []):
@@ -100,8 +108,11 @@ class Environment(object):
         data = json.dumps({'environmentId': self.id})
         return router.put_organization_default_environment(org_id=self.organizationId, data=data).json()
 
-    def list_available_services(self):
+    def list_available_services_json(self):
         return router.get_environment_available_services(org_id=self.organizationId, env_id=self.environmentId).json()
+
+    def list_services_json(self):
+        return self.json()['services']
 
     _put_environment = lambda self, data: router.put_environment(org_id=self.organizationId, env_id=self.environmentId, data=data)
 
@@ -111,16 +122,14 @@ class Environment(object):
         data['services'].append(service.json())
 
         resp = self._put_environment(data=json.dumps(data))
-        self.services.append(service)
         return resp.json()
 
     def remove_service(self, service):
         data = self.json()
         data['serviceIds'].remove(service.instanceId)
-        data['services'].remove(service.json())
+        data['services']=[s for s in data['services'] if s['id'] != service.id]
 
         resp = self._put_environment(data=json.dumps(data))
-        self.services.remove(service)
         return resp.json()
 
     def add_marker(self, marker):
@@ -187,9 +196,6 @@ class Environment(object):
 
     def set_backend(self, zone):
         raise exceptions.ApiError("Change environment backend is not supported, since 24.x")
-        # data = self.json()
-        # data.update({'backend': zone.zoneId})
-        # return self._put_environment(data=json.dumps(data)).json()
 
 class EnvironmentList(QubellEntityList):
     base_clz = Environment

@@ -36,8 +36,8 @@ class EnvironmentClassTest(BaseTestCase):
 
     @classmethod
     def tearDownClass(cls):
-        cls.app.delete()
         cls.env.delete()
+        cls.app.delete()
         super(EnvironmentClassTest, cls).tearDownClass()
 
 
@@ -62,7 +62,7 @@ class EnvironmentClassTest(BaseTestCase):
         self.assertTrue(my_env in self.org.environments)
 
         # check we cannot create already created application
-        new_env = self.org.get_environment(id=my_env.id).create(name='sdf')
+        new_env = self.org.get_environment(id=my_env.id)
         self.assertEqual(my_env, new_env)
 
         self.assertTrue(self.org.delete_environment(my_env.id))
@@ -108,3 +108,34 @@ class EnvironmentClassTest(BaseTestCase):
 
         # Clean
         self.assertTrue(base_env.delete())
+
+    def test_service_crud(self):
+        env = self.env
+        initial_len = len(env.services)
+        wf = self.org.get_service(name="Default workflow service")
+        env.add_service(wf)
+        env.add_service(wf) #operation idempotent
+        assert len(env.services) == 1
+        service = self.org.create_service(self.app, environment=env)
+        assert len(env.services) == 2
+        service.ready()
+        assert service.id in env.services
+        assert service.instanceId in env.services
+        self.org.get_or_create_service(service.name)
+        assert len(env.services) == 2
+        self.org.get_or_create_service(service.id)
+        self.org.get_or_create_service(service.instanceId)
+        assert len(env.services) == 2
+        env.remove_service(wf)
+        assert len(env.services) == 1
+        service.destroy()
+        assert service.destroyed()
+        assert len(env.services) == 0
+
+    def test_policy_crud(self): pass
+
+    def test_marker_crud(self): pass
+
+    def test_property_crud(self): pass
+
+

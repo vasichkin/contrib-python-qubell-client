@@ -19,23 +19,18 @@ __license__ = "Apache"
 __email__ = "vkhomenko@qubell.com"
 
 from qubell.api.private import exceptions
-from qubell.api.private.common import QubellEntityList
+from qubell.api.private.common import QubellEntityList, Entity
 from qubell.api.provider.router import ROUTER as router
 
-class Zone(object):
-    def __init__(self, organization, id, auth=None):
+class Zone(Entity):
+    def __init__(self, organization, id):
         self.zoneId = self.id = id
         self.organizationId = organization.organizationId
         self.organization = organization
-        my = self.json()
-        self.name = my['name']
 
-    def __getattr__(self, key):
-        resp = self.json()
-        if resp.has_key(key):
-            return resp[key]
-        raise exceptions.NotFoundError('Cannot get zone property %s' % key)
-
+    @property
+    def name(self):
+        return self.json()['name']
 
     def json(self):
         resp = router.get_zones(org_id=self.organizationId)

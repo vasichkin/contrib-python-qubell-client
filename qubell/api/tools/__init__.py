@@ -32,32 +32,54 @@ def rand():
 def cpath(file):
     return os.path.join(os.path.dirname(__file__), file)
 
-def retry(tries=5, delay=3, backoff=2):
+def retry(tries=5, delay=3, backoff=2, retry_exception=None):
     """
-    Retry "tries" times, with initial "delay", increasing delay "delay*backoff" each time
+    Retry "tries" times, with initial "delay", increasing delay "delay*backoff" each time.
+    Without exception success means when function returns valid object.
+    With exception success when no exceptions
     """
 
     def deco_retry(f):
         def f_retry(*args, **kwargs):
             mtries, mdelay = tries, delay
-            rv = f(*args, **kwargs)
+
             while mtries > 0:
-                if rv is True:
+                try:
+                    rv = f(*args, **kwargs)
+                except retry_exception:
+                    rv = False
+                else:
+                    #if we expect to catch something, but f, doesn't return anything
+                    #another word, nice indicator if no exceptions
+                    if retry_exception:
+                        rv = True
+                if rv:
                     return True
                 mtries -= 1
+                log.debug("...{0} sleeping for {1} s in retry".format(f.__name__,mdelay))
                 time.sleep(mdelay)
                 mdelay *= backoff
-                rv = f(*args, **kwargs)
-            return False
+            return f(*args, **kwargs)
         return f_retry
     return deco_retry
 
-def waitForStatus(instance, final='Running', accepted=['Requested'], timeout=[20, 10, 1]):
+def waitForStatus(instance, final='Running', accepted=None, timeout=(20, 10, 1)):
+    if not accepted: accepted = ['Requested']
+
     log.debug('Waiting status: %s' % final)
-    import time #TODO: We have to wait, because privious status takes time to change to new one
-    time.sleep(10)
+    import time
+
+    @retry(3, 1, 2) # max = 1 + 2 + 4 = 7 seconds + routes time
+    def projection_update_monitor():
+        """
+        We have to deal with lag when projection updates instance.
+        :return:
+        """
+        return instance.status != final and instance._is_projection_updated_instance()
+    projection_update_monitor()
+
     @retry(*timeout) # ask status 20 times every 10 sec.
-    def waiter():
+    def instance_status_waiter():
         cur_status = instance.status
         if cur_status in final:
             log.info('Got status: %s, continue' % cur_status)
@@ -67,17 +89,19 @@ def waitForStatus(instance, final='Running', accepted=['Requested'], timeout=[20
             return False
         else:
             log.error('Got unexpected instance status: %s' % cur_status)
-            return True # Let retry exit
+            return True  # Let retry exit
 
-    waiter()
+    instance_status_waiter()
     # We here, means we reached timeout or got status we are waiting for.
     # Check it again to be sure
 
     cur_status = instance.status
     log.info('Final status: %s' % cur_status)
+    instance._last_workflow_started_time = time.gmtime(time.time())
     if cur_status in final:
         return True
     else:
+        log.error("Didn't get '{0}' stopped in '{1}' with error '''{2}'''".format(final, cur_status, instance.error))
         return False
 
 def dump(node):
@@ -91,7 +115,6 @@ def dump(node):
     from qubell.api.private.revision import Revision
     from qubell.api.private.provider import Provider
     from qubell.api.private.environment import Environment
-    from qubell.api.private.service import ServiceLegacy
     from qubell.api.private.zone import Zone
     from qubell.api.private.manifest import Manifest
 
@@ -107,7 +130,6 @@ def dump(node):
         Revision: ['auth', 'revisionId'],
         Provider: ['auth', 'providerId', 'organization'],
         Environment: ['auth', 'environmentId', 'organization'],
-        ServiceLegacy: ['auth', 'organization', 'zone', 'serviceId'],
         Zone: ['auth', 'zoneId', 'organization'],
     }
 
@@ -160,5 +182,5 @@ def lazy(func):
     return lazyfunc
 
 def is_bson_id(bson_id):
-    id_pattern = "[A-Fa-f0-9]{24}"
-    return re.match(id_pattern, str(bson_id))
+    id_pattern = u'[A-Fa-f0-9]{24}'
+    return re.match(id_pattern, unicode(bson_id))

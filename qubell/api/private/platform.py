@@ -16,12 +16,16 @@ import logging as log
 import warnings
 
 import simplejson as json
+from qubell.api.private import exceptions
+from qubell.api.private.organization import OrganizationList, Organization
 
 from qubell.api.provider.router import ROUTER as router
 from qubell import deprecated
 
 #todo: understood, that some people may use this object for authentication, need to move this to proper place
-from qubell.api.private.common import Auth
+from qubell.api.private.common import Auth, EntityList, IdName
+from qubell.api.tools import lazyproperty
+
 Auth = Auth # Auth usage, to be sure won't be removed from imports
 
 __author__ = "Vasyl Khomenko"
@@ -34,58 +38,57 @@ class QubellPlatform(object):
         if context:
             warnings.warn("replace context with auth name, it is deprecated and will be removed", DeprecationWarning,
                           stacklevel=2)
-
-        self.organizations = []
         self.auth = auth or context
-        self.user = self.auth.user
-        self.password = self.auth.password
-        self.tenant = self.auth.tenant
 
+    @staticmethod
+    def connect(tenant, user, password):
+
+        router.base_url = tenant
+        router.connect(user, password)
+
+        #todo: remove auth mimics when routes are used everywhere
+        router.tenant = tenant
+        router.user = user
+        router.password = password
+        return QubellPlatform(auth=router)
+
+    @deprecated('use QubellPlatform.connect instead')
     def authenticate(self):
-        router.base_url = self.tenant
+        router.base_url = self.auth.tenant
         router.connect(self.auth.user, self.auth.password)
         #todo: remove following, left for compatibility
         self.auth.cookies = router._cookies
         return True
 
-    def create_organization(self, name):
-        log.info("Creating organization: %s" % name)
-        payload = json.dumps({'editable': 'true',
-                              'name': name})
-        resp = router.post_organization(data=payload)
-        return self.get_organization(resp.json()['id'])
-
-
-    def get_organization(self, id):
-        log.info("Picking organization: %s" % id)
-        from qubell.api.private.organization import Organization
-
-        org = Organization(id)
-        self.organizations.append(org)
-        return org
-
-    def get_or_create_organization(self, id=None, name=None):
-        """ Smart object. Will create organization, modify or pick one"""
-        name = name or 'generated-org-name'
-        if id: return self.get_organization(id)
-        else:
-            orgz = [org for org in self.list_organizations() if org['name'] == name]
-            # Org found by name
-            if len(orgz):
-                return self.get_organization(orgz[0]['id'])
-            else:
-                return self.create_organization(name)
-
-    organization = get_or_create_organization
-
-    def organizations_json(self):
+    def list_organizations_json(self):
         resp = router.get_organizations()
         return resp.json()
 
-    list_organizations = organizations_json
-
+    @lazyproperty
     def organizations(self):
-        return OrganizationList(self.organizations_json())
+        return OrganizationList(self.list_organizations_json)
+
+    def create_organization(self, name):
+        return Organization.new(name)
+
+    def get_organization(self, id=None, name=None):
+        log.info("Picking organization: %s" % id)
+        if id:
+            return Organization(id) #speed-up, to avoid fetching all organizations
+        else:
+            return self.organizations[name]
+
+    def get_or_create_organization(self, id=None, name=None):
+        """ Smart object. Will create organization, modify or pick one"""
+        if id: return self.get_organization(id)
+        else:
+            assert name
+            try:
+                return self.get_organization(name=name)
+            except exceptions.NotFoundError:
+                return self.create_organization(name)
+
+    organization = get_or_create_organization
 
     def restore(self, config):
         for org in config.pop('organizations', []):
@@ -95,3 +98,4 @@ class QubellPlatform(object):
     @deprecated
     def get_context(self):
         return self.auth
+

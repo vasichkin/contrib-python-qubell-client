@@ -12,6 +12,7 @@
 # implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from qubell.api.private.common import EntityList, Entity, IdName
 
 __author__ = "Vasyl Khomenko"
 __copyright__ = "Copyright 2013, Qubell.com"
@@ -21,17 +22,16 @@ __email__ = "vkhomenko@qubell.com"
 from qubell.api.private import exceptions
 from qubell.api.provider.router import ROUTER as router
 
-class Revision(object):
+class Revision(Entity):
     """
     Base class for revision
     """
 
-    def __init__(self, auth, application, id):
-        self.revisionId = id
+    def __init__(self, application, id):
+        self.revisionId = self.id = id
         self.application = application
         self.organizationId = self.application.organizationId
         self.applicationId = self.application.applicationId
-        self.auth = auth
         my = self.json()
         self.name = my['name']
 
@@ -47,3 +47,16 @@ class Revision(object):
     def delete(self):
         router.delete_revision(org_id=self.organizationId, app_id=self.applicationId, rev_id=self.revisionId)
         return True
+
+class RevisionList(EntityList):
+    def __init__(self, list_json_method, application):
+        self.json = list_json_method
+        self.application=application
+        self.applicationId=application.id
+        self.organization=application.organization
+        self.organization=application.organization.organizationId
+        EntityList.__init__(self)
+    def _id_name_list(self):
+        self._list = [IdName(ent['id'], ent['name']) for ent in self.json()]
+    def _get_item(self, id_name):
+        return Revision(id=id_name.id, application=self.application)

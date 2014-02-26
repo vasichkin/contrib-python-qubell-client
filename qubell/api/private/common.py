@@ -29,6 +29,12 @@ __email__ = "vkhomenko@qubell.com"
 
 IdName = namedtuple('IdName', 'id,name')
 
+class Entity(object):
+    def __eq__(self, other):
+        return self.id == other.id
+    def __ne__(self, other):
+        return not self.__eq__(other)
+
 class EntityList(object):
     """ Class to store qubell objects information (Instances, Applications, etc)
     Gives convenient way for searching and manipulating objects, it caches only id and names.
@@ -39,16 +45,19 @@ class EntityList(object):
         self._id_name_list()
 
     def __iter__(self):
+        self._id_name_list()
         for i in self._list:
             yield self._get_item(i)
 
     def __len__(self):
+        self._id_name_list()
         return len(self._list)
 
     def __repr__(self):
         return "{0}({1})".format(self.__class__.__name__, str(self._list))
 
     def __getitem__(self, item):
+        self._id_name_list()
         if isinstance(item, int): return self._get_item(self._list[item])
         elif isinstance(item, slice): return [self._get_item(i) for i in self._list[item]]
 
@@ -58,6 +67,7 @@ class EntityList(object):
         return self._get_item(found[-1])
 
     def __contains__(self, item):
+        self._id_name_list()
         if isinstance(item, str) or isinstance(item, unicode):
             if is_bson_id(item):
                 return item in [item.id for item in self._list]
@@ -93,18 +103,18 @@ class QubellEntityList(EntityList):
 
 
     def _id_name_list(self):
-        start = time.time()
+        # start = time.time()
         self._list = [IdName(ent['id'], ent['name']) for ent in self.json()]
-        end = time.time()
-        elapsed = int((end - start) * 1000.0)
-        log.debug(
-            "  Listing Time: Fetching List {0} took {elapsed} ms".format(self.__class__.__name__, elapsed=elapsed))
+        # end = time.time()
+        # elapsed = int((end - start) * 1000.0)
+        # log.debug(
+        #     "  Listing Time: Fetching List {0} took {elapsed} ms".format(self.__class__.__name__, elapsed=elapsed))
 
     # noinspection PyUnresolvedReferences
     def _get_item(self, id_name):
         assert self.base_clz, "Define 'base_clz' in constructor or override this method"
         start = time.time()
-        entity = self.base_clz(organization=self.organization, id=id_name.id, auth=None)
+        entity = self.base_clz(organization=self.organization, id=id_name.id)
         end = time.time()
         elapsed = int((end - start) * 1000.0)
         log.debug(

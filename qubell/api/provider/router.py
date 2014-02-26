@@ -106,7 +106,7 @@ class Router(object):
 
     @play_auth
     @route("DELETE /organizations/{org_id}/applications/{app_id}/revisions/{rev_id}{ctype}")
-    def delete_revision(self, org_id, app_id, rev_id, cookies, ctype=".json"): pass
+    def delete_revision(self, org_id, app_id, rev_id, cookies, data="{}", ctype=".json"): pass
 
     #Instance
     @play_auth

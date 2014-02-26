@@ -28,7 +28,7 @@ from functools import wraps
 
 from qubell.api.private.instance import Instance
 from qubell.api.private.manifest import Manifest
-from qubell.api.private.service import COBALT_SECURE_STORE_TYPE, WORKFLOW_SERVICE_TYPE
+from qubell.api.private.service import system_application_types, COBALT_SECURE_STORE_TYPE, WORKFLOW_SERVICE_TYPE
 
 
 from requests import api
@@ -267,9 +267,11 @@ class SandBox(object):
         return SandBox(platform, yaml.safe_load(yaml_file))
 
     def __service(self, environment, service_data):
-        service = self.organization.service(type=service_data["type"], name=service_data["name"],
+
+        application = self.organization.applications[system_application_types.get(service_data["type"],service_data["type"])]
+        service = self.organization.service(application=application, name=service_data["name"],
                                             environment=environment,
-                                            parameters=(service_data.get("parameters", {})))
+                                            parameters=(service_data.get("parameters")))
         service.ready(1)
         environment.add_service(service)
         if COBALT_SECURE_STORE_TYPE is service_data["type"]:

@@ -40,7 +40,7 @@ class ZonesClassTest(BaseTestCase):
     def test_get_default_zone(self):
         zn = self.org.get_default_zone()
         self.assertTrue(zn in self.org.zones)
-        self.assertEqual(self.org.zone, zn)
+        self.assertEqual(self.org.zone.zoneId, zn.zoneId)
 
 
     def test_zones_sugar(self):
@@ -49,6 +49,7 @@ class ZonesClassTest(BaseTestCase):
 
         self.assertTrue(zn in org.zones)
         self.assertEqual(org.zones['Qubell/us-east'], zn)
+        self.assertEqual(org.zones['Qubell/us-east'].id, zn.id)
         self.assertEqual(org.zones['Qubell/us-east'].name, zn.name)
         self.assertEqual(org.zones['Qubell/us-east'].id, zn.id)
 
@@ -63,16 +64,15 @@ class ZonesClassTest(BaseTestCase):
         self.assertTrue(my_env.id)
         self.assertTrue(my_env in self.org.environments)
 
-        # check we cannot create already created application
-        new_env = self.org.get_environment(id=my_env.id).create(name='sdf')
-        self.assertEqual(my_env, new_env)
+        same_env = self.org.get_environment(id=my_env.id)
+        self.assertEqual(my_env.id, same_env.id)
 
         self.assertTrue(self.org.delete_environment(my_env.id))
 
 
     def test_get_or_create_environment_method(self):
         org = self.org
-        env = self.env
+        env = org.defaultEnvironment
         # Get tests
         self.assertEqual(env, org.get_or_create_environment(id=env.id))
         self.assertEqual(env, org.get_or_create_environment(name=env.name))
@@ -86,7 +86,7 @@ class ZonesClassTest(BaseTestCase):
 
     def test_smart_environment_method(self):
         org = self.org
-        env = self.env
+        env = self.org.defaultEnvironment
         base_env = org.get_or_create_environment(name='Self-smart_environment_method')
 
         # Get environment

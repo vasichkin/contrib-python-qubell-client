@@ -57,8 +57,7 @@ class ApplicationClassTest(BaseTestCase):
         self.assertTrue(my_app.name)
         self.assertTrue(my_app in self.org.applications)
 
-        # check we cannot create already created application
-        new_app = self.org.get_application(id=my_app.id).create(name='sdf', manifest=self.manifest)
+        new_app = self.org.get_application(id=my_app.id)
         self.assertEqual(my_app, new_app)
 
         self.assertTrue(my_app.delete())
@@ -109,9 +108,9 @@ class ApplicationClassTest(BaseTestCase):
         # Clean
         self.assertTrue(base_app.delete())
 
-"""
+
     def test_revision_create(self):
-        app = self.org.application(manifest=self.manifest, name='test-revision-create')
+        app = self.app
 
         instance = app.launch(destroyInterval=600000)
         self.assertTrue(instance.ready())
@@ -121,5 +120,3 @@ class ApplicationClassTest(BaseTestCase):
         self.assertTrue(revision)
         self.assertTrue(app.clean())
         self.assertTrue(instance.destroyed())
-        self.assertTrue(app.delete())
-"""

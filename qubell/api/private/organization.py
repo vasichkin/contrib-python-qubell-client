@@ -14,7 +14,9 @@
 # limitations under the License.
 import warnings
 from qubell import deprecated
-from qubell.api.private.service import system_application_types
+from qubell.api.private.common import EntityList, IdName
+from qubell.api.private.service import system_application_types, COBALT_SECURE_STORE_TYPE, WORKFLOW_SERVICE_TYPE, \
+    SHARED_INSTANCE_CATALOG_TYPE
 from qubell.api.tools import lazyproperty
 
 __author__ = "Vasyl Khomenko"
@@ -27,7 +29,7 @@ import simplejson as json
 
 from qubell.api.private.manifest import Manifest
 from qubell.api.private import exceptions
-from qubell.api.private.instance import InstanceList, DEAD_STATUS
+from qubell.api.private.instance import InstanceList, DEAD_STATUS, Instance
 from qubell.api.private.application import ApplicationList
 from qubell.api.private.environment import EnvironmentList
 from qubell.api.private.zone import ZoneList
@@ -43,6 +45,14 @@ class Organization(object):
 
         my = self.json()
         self.name = my['name']
+
+    @staticmethod
+    def new(name):
+        log.info("Creating organization: %s" % name)
+        payload = json.dumps({'editable': 'true',
+                              'name': name})
+        resp = router.post_organization(data=payload)
+        return Organization(resp.json()['id'])
 
     @lazyproperty
     def environments(self):
@@ -102,26 +112,13 @@ class Organization(object):
         if not name:
             name = 'auto-generated-name'
         from qubell.api.private.application import Application
-        app = Application(organization=self).create(name=name, manifest=manifest)
-        self.applications.add(app)
-        return app
+        return Application.new(self, name, manifest)
 
     def get_application(self, id=None, name=None):
         """ Get application object by name or id.
         """
-        if id:
-            apps = [x for x in self.applications if x.id == id]
-        elif name:
-            apps = [x for x in self.applications if x.name == name]
-        else:
-            raise exceptions.NotEnoughParams('No name nor id given. Unable to get application')
-
-        if len(apps) == 1:
-            return apps[0]
-        elif len(apps) > 1:
-            log.warning('Found several applications with name %s. Picking last' % name)
-            return apps[-1]
-        raise exceptions.NotFoundError('Unable to get application by id: %s' % id)
+        criteria = id or name
+        return self.applications[criteria]
 
     def list_applications_json(self):
         """ Return raw json
@@ -188,190 +185,104 @@ class Organization(object):
 
 # INSTANCE
 
-    def create_instance(self, application, revision=None, environment=None, name=None, parameters={}, destroyInterval=None):
+    def create_instance(self, application, revision=None, environment=None, name=None, parameters=None,
+                        destroyInterval=None):
         """ Launches instance in application and returns Instance object.
         """
-        if not application:
-            raise exceptions.NotEnoughParams('Application not set')
-        instance = application.create_instance(name=name,
-                                    environment=environment,
-                                    revision=revision,
-                                    parameters=parameters,
-                                    destroyInterval=destroyInterval)
-        self.instances.add(instance)
-        return instance
+        from qubell.api.private.instance import Instance
+        return Instance.new(application, revision, environment, name, parameters, destroyInterval)
 
-    def get_instance(self, application=None, id=None, name=None):
+    def get_instance(self, id=None, name=None):
         """ Get instance object by name or id.
         If application set, search within the application.
         """
+        if id:  # submodule instances are invisible for lists
+            return Instance(id=id, organization=self)
+        return self.instances[id or name]
 
-        if application:
-            instances = [x for x in self.instances if x.applicationId == application.applicationId]
-        else:
-            instances = self.instances
-
-        if id:
-            instance = [x for x in instances if x.id == id]
-        elif name:
-            instance = [x for x in instances if x.name == name]
-        else:
-            raise exceptions.NotEnoughParams('No name nor id given. Unable to get instance')
-
-        if len(instance) == 1:
-            return instance[0]
-        elif len(instance) > 1:
-            log.warning('Found several instances with name %s. Picking last' % name)
-            return instance[-1]
-        raise exceptions.NotFoundError('Unable to get instance by id: %s' % id)
-
-    #todo: application should not be parameter here. Application should do its own list
     def list_instances_json(self, application=None):
         """ Get list of instances in json format converted to list"""
-        if application:
+        if application:  # todo: application should not be parameter here. Application should do its own list
             warnings.warn("organization.list_instances_json(app) is deprecated, use app.list_instances_json", DeprecationWarning, stacklevel=2)
             instances = application.list_instances_json()
         else:  # Return all instances in organization
             instances = router.get_instances(org_id=self.organizationId).json()
         return [ins for ins in instances if ins['status'] not in DEAD_STATUS]
 
-    def delete_instance(self, id):
-        instance = self.get_instance(id)
-        self.instances.remove(instance)
-        return instance.delete()
-
-    def get_or_launch_instance(self, id=None, application=None, name=None, **kwargs):
+    def get_or_create_instance(self, id=None, application=None, revision=None, environment=None, name=None, parameters=None,
+                               destroyInterval=None):
         """ Get instance by id or name.
-        If not found: create with given application (name and params are optional)
+        If not found: create with given parameters
         """
-        if id:
-            return self.get_instance(id=id)
-        elif name:
-            try:
-                instance = self.get_instance(name=name)
-            except exceptions.NotFoundError:
-                instance = self.create_instance(application=application, name=name, **kwargs)
+        try:
+            instance = self.get_instance(id=id, name=name)
+            if name and name != instance.name:
+                instance.rename(name)
+                instance.ready()
             return instance
-        elif application:
-            return self.create_instance(application=application, **kwargs)
-        raise exceptions.NotEnoughParams('Not enough parameters')
+        except exceptions.NotFoundError:
+            return self.create_instance(application, revision, environment, name, parameters, destroyInterval)
+    get_or_launch_instance = get_or_create_instance
 
-    def instance(self, application=None, id=None, name=None, revision=None, environment=None,  parameters={}):
+    def instance(self, id=None, application=None, name=None, revision=None, environment=None, parameters=None, destroyInterval=None):
         """ Smart method. It does everything, to return Instance with given parameters within the application.
         If instance found running and given parameters are actual: return it.
         If instance found, but parameters differs - reconfigure instance with new parameters.
         If instance not found: launch instance with given parameters.
         Return: Instance object.
         """
+        instance = self.get_or_create_instance(id, application, revision, environment, name, parameters, destroyInterval)
 
-        modify = False
-        found = False
-
-        # Try to find instance by name or id
-        if name and id:
-            found = self.get_instance(application=application, id=id)
-            if not found.name == name:
-                modify = True
-        elif id:
-            found = self.get_instance(application=application, id=id)
-            name = found.name
-
-        elif name:
-            try:
-                found = self.get_instance(application=application, name=name)
-                id = found.instanceId
-            except exceptions.NotFoundError:
-                pass
-
-        # If found - compare parameters
-        # TODO:
-        """
-        if found:
-            if revision and not revision == found.revision:
-                modify = True
-            if environment and not environment == found.environment:
-                modify = True
-            if parameters and not parameters == found.parameters:
-                modify = True
-        """
+        reconfigure = False
+        # if found:
+        #     if revision and revision is not found.revision:
+        #         reconfigure = True
+        #     if parameters and parameters is not found.parameters:
+        #         reconfigure = True
 
         # We need to reconfigure instance
-        if found and modify:
-            found.reconfigure(revision=revision, environment=environment, name=name, parameters=parameters)
+        if reconfigure:
+            instance.reconfigure(revision=revision, parameters=parameters)
 
-        if not found:
-            created = self.create_instance(application=application, revision=revision, environment=environment, name=name, parameters=parameters)
-
-        return found or created
+        return instance
 
 
 ### SERVICE
-    def create_service(self, name, type, parameters, zone=None, environment=None):
-        assert not zone, "Api has changed, zone is deprecated and will be removed soon, define environment"
-        assert environment, "Api has changed, please define environment"
+    def create_service(self, application, revision=None, environment=None, name=None, parameters=None,
+                       destroyInterval=None):
+        if application.name in system_application_types.values():
+             destroyInterval = -1  # never for system applications
 
-        #try to map type to name or treat type as name
-        application_name = system_application_types.get(type, type)
-        if application_name in system_application_types.values():
-            destroyInterval = -1  # never for system applications
-        else:
-            destroyInterval = 3600000  # magic number = 1 hour
-
-        instance = self.create_instance(
-            name=name,
-            application=self.applications[application_name],
-            environment=environment,
-            parameters=parameters,
-            destroyInterval=destroyInterval)
-
-        environment.add_service(instance)
+        instance = self.create_instance(application, revision, environment, name, parameters, destroyInterval)
+        instance.environment.add_service(instance)
         return instance
 
-    def create_keystore_service(self, name='generated-keystore', parameters={}, zone=None):
-        parameters["destroyInterval"] = "-1"
-        return self.create_service(name=name, type='builtin:cobalt_secure_store', parameters=parameters, zone=zone)
+    def create_keystore_service(self, name='generated-keystore', parameters=None):
+        application = self.applications[system_application_types(COBALT_SECURE_STORE_TYPE)]
+        return self.create_service(name=name, application=application, parameters=parameters)
 
-    def create_workflow_service(self, name='generated-workflow', policies={}, zone=None):
-        parameters = {'configuration.policies': json.dumps(policies), "destroyInterval": "-1"}
-        return self.create_service(name=name, type='builtin:workflow_service', parameters=parameters, zone=zone)
+    def create_workflow_service(self, name='generated-workflow', policies=None, zone=None):
+        parameters = {'configuration.policies': json.dumps(policies or {})}
+        application = self.applications[system_application_types(WORKFLOW_SERVICE_TYPE)]
+        return self.create_service(name=name, application=application, parameters=parameters)
 
-    def create_shared_service(self, name='generated-shared', instances={}, zone=None):
-        parameters = {'configuration.shared-instances': json.dumps(instances), "destroyInterval": "-1"}
-        return self.create_service(name=name, type='builtin:shared_instances_catalog', parameters=parameters, zone=zone)
+    def create_shared_service(self, name='generated-shared', instances=None, zone=None):
+        parameters = {'configuration.shared-instances': json.dumps(instances or {})}
+        application = self.applications[system_application_types(SHARED_INSTANCE_CATALOG_TYPE)]
+        return self.create_service(name=name, application=application, parameters=parameters)
 
-    def get_service(self, id):
-        log.info("Picking service: %s" % id)
-        instance = self.get_instance(id=id)
-        self.services.append(instance)
-        return instance
+    get_service = get_instance
 
     def list_services_json(self):
         return router.get_services(org_id=self.organizationId).json()
 
-    @deprecated("use list_serivces_json instead")
-    def list_services(self): return self.list_services_json()
-
-    def delete_service(self, id):
-        srv = self.get_service(id)
-        self.services.remove(srv)
-        return srv.delete()
-
-    def get_or_create_service(self, id=None, name=None, type=None, parameters={}, zone=None, environment=None):
+    def get_or_create_service(self, id=None, application=None, revision=None, environment=None, name=None, parameters=None,
+                              destroyInterval=None):
         """ Get by name or create service with given parameters"""
-        assert id or name
-        assert not zone, "Api has changed, zone is deprecated and will be removed soon, define environment"
-        assert environment, "Api has changed, please define environment"
-        if id: return self.get_service(id)
-        if name:
-            if name in self.services:
-                service = self.services[name]
-                assert service.status == "Running", "Found service-instance-{0} is not in Running state".format(service.instanceId)
-                #if zones doesn't match, provide users with exhaustive information
-                assert service.environment.zoneId is environment.zoneId, \
-                    "Found service-instance-{0} zone, doesn't match environment-{1} zone. Zone {2} is not {3}".format(service.instanceId, environment.environmentId, service.environment.zoneId, environment.zoneId)
-                return service
-            else:
-                return self.create_service(name, type, environment=environment, parameters=parameters)
+        try:
+            return self.get_instance(id=id, name=name)
+        except exceptions.NotFoundError:
+            return self.create_service(application, revision, environment, name, parameters, destroyInterval)
 
     service = get_or_create_service
 
@@ -380,9 +291,7 @@ class Organization(object):
         """ Creates environment and returns Environment object.
         """
         from qubell.api.private.environment import Environment
-        env = Environment(organization=self).create(name=name, zone=zone, default=default)
-        self.environments.add(env)
-        return env
+        return Environment.new(organization=self,name=name, zone=zone, default=default)
 
     def list_environments_json(self):
         return router.get_environments(org_id=self.organizationId).json()
@@ -390,22 +299,11 @@ class Organization(object):
     def get_environment(self, id=None, name=None):
         """ Get environment object by name or id.
         """
-        if id:
-            envs = [x for x in self.environments if x.id == id]
-        elif name:
-            envs = [x for x in self.environments if x.name == name]
-        else:
-            raise exceptions.NotEnoughParams('No name nor id given. Unable to get application')
-        if len(envs) == 1:
-            return envs[0]
-        elif len(envs) > 1:
-            log.warning('Found several environments with name %s. Picking last' % name)
-            return envs[-1]
-        raise exceptions.NotFoundError('Unable to get environment by id: %s' % id)
+        criteria = id or name
+        return self.environments[criteria]
 
     def delete_environment(self, id):
         env = self.get_environment(id)
-        self.environments.remove(env)
         return env.delete()
 
     def get_or_create_environment(self, id=None, name=None, zone=None, default=False):
@@ -556,3 +454,12 @@ class Organization(object):
             zoneId = zones[0]['id']
             return self.get_zone(id=zoneId)
         raise exceptions.NotFoundError('Unable to get default zone')
+
+class OrganizationList(EntityList):
+    def __init__(self, list_json_method):
+        self.json = list_json_method
+        EntityList.__init__(self)
+    def _id_name_list(self):
+        self._list = [IdName(ent['id'], ent['name']) for ent in self.json()]
+    def _get_item(self, id_name):
+        return Organization(id=id_name.id)

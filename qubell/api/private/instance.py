@@ -30,12 +30,12 @@ from qubell.api.tools import lazyproperty
 
 from qubell.api.tools import waitForStatus as waitForStatus
 from qubell.api.private import exceptions
-from qubell.api.private.common import QubellEntityList
+from qubell.api.private.common import QubellEntityList, Entity
 from qubell.api.provider.router import ROUTER as router
 
 DEAD_STATUS = ['Destroyed', 'Destroying']
 
-class Instance(ServiceMixin):
+class Instance(Entity, ServiceMixin):
     """
     Base class for application instance. Manifest required.
     """
@@ -46,19 +46,13 @@ class Instance(ServiceMixin):
             ret[val['id']] = val['value']
         return ret
 
-    def __init__(self, organization, id=None, auth=None, **kwargs):
-        if hasattr(self, 'instanceId'):
-            log.warning("Instance reinitialized. Dangerous!")
-        if auth:
-            warnings.warn("'auth' param is deprecated, and will be removed soon", DeprecationWarning, stacklevel=2)
-            self.auth = auth
+    def __init__(self, organization, id):
+        self.instanceId = self.id = id
         self.organization = organization
         self.organizationId = organization.organizationId
-        self.__dict__.update(kwargs)
-        self.__cached_json=None
-        if id:
-            self.instanceId = self.id = id
-            self.json()
+
+        self.__cached_json = None
+        self._last_workflow_started_time = None
 
     @lazyproperty
     def applicationId(self): return self.json()['applicationId']
@@ -73,6 +67,10 @@ class Instance(ServiceMixin):
     @lazyproperty
     def environment(self): return self.organization.get_environment(self.environmentId)
 
+    @lazyproperty
+    def submodules(self):
+        return InstanceList(list_json_method=lambda: self.json()['submodules'], organization=self.organization)
+
     @property
     def status(self): return self.json()['status']
 
@@ -82,8 +80,12 @@ class Instance(ServiceMixin):
     @property
     def return_values(self): return self.__parse(self.json()['returnValues'])
 
-    #alias
-    returnValues=return_values
+    @property
+    def error(self): return self.json()['errorMessage']
+
+    #aliases
+    returnValues = return_values
+    errorMessage = error
 
     @property
     def parameters(self): return self.json()['revision']['parameters']
@@ -98,13 +100,17 @@ class Instance(ServiceMixin):
             log.debug('Getting instance attribute: %s' % key)
             return self.json()[key]
 
+    def _cache_free(self):
+        """Frees cache"""
+        self.__cached_json = None
+
     def fresh(self):
         #todo: create decorator from this
         if self.__cached_json is None:
             return False
         now = time.time()
         elapsed = (now - self.__last_read_time) * 1000.0
-        return elapsed < 500
+        return elapsed < 300
 
     def json(self):
         '''
@@ -113,14 +119,13 @@ class Instance(ServiceMixin):
         '''
 
         if self.fresh():
-            log.debug("using cached instance")
             return self.__cached_json
         self.__last_read_time = time.time()
         self.__cached_json = router.get_instance(org_id=self.organizationId, instance_id=self.instanceId).json()
         return self.__cached_json
 
     @staticmethod
-    def new(application=None, revision=None, environment=None, name=None, parameters=None, destroyInterval=None):
+    def new(application, revision=None, environment=None, name=None, parameters=None, destroyInterval=None):
         if not parameters: parameters = {}
         if environment:  # if environment set, it overrides parameter
             parameters['environmentId'] = environment.environmentId
@@ -134,36 +139,23 @@ class Instance(ServiceMixin):
             parameters['revisionId'] = revision.revisionId
 
         data = json.dumps(parameters)
+        before_creation = time.gmtime(time.time())
         resp = router.post_organization_instance(org_id=application.organizationId, app_id=application.applicationId, data=data)
-        return Instance(organization=application.organization, id=resp.json()['id'])
-
-    @deprecated("Use static method 'Instance.new' instead")
-    def create(self, application=None, revision=None, environment=None, name=None, parameters={}):
-        # Check we already has instance associated with us
-        if hasattr(self, 'instanceId'):
-            return self
-
-        assert application, "Api changed, define 'application' explicitly to create"
-        return Instance.new(application, revision, environment, name, parameters)
-
-    def by_name(self, name):
-        instance = self.organization.get_instance(name=name)
-        #instance = [x for x in self.organization.instances if x.name == name]
+        instance = Instance(organization=application.organization, id=resp.json()['id'])
+        instance._last_workflow_started_time = before_creation
         return instance
 
-    def by_id(self, id):
-        return Instance(id=id, organization=self.organization)
-
     def ready(self, timeout=3):  # Shortcut for convinience. Timeout = 3 min (ask timeout*6 times every 10 sec)
-        return waitForStatus(instance=self, final='Running', accepted=['Launching', 'Requested', 'Executing', 'Unknown'], timeout=[timeout*6, 10, 1])
+        return waitForStatus(instance=self, final='Running', accepted=['Launching', 'Requested', 'Executing', 'Unknown'], timeout=[timeout*20, 3, 1])
         # TODO: Unknown status  should be removed
 
         #TODO: not available
     def destroyed(self, timeout=3):  # Shortcut for convinience. Temeout = 3 min (ask timeout*6 times every 10 sec)
-        return waitForStatus(instance=self, final='Destroyed', accepted=['Destroying', 'Running'], timeout=[timeout*6, 10, 1])
+        return waitForStatus(instance=self, final='Destroyed', accepted=['Destroying', 'Running'], timeout=[timeout*20, 3, 1])
 
     def run_workflow(self, name, parameters={}):
         log.info("Running workflow %s" % name)
+        self._last_workflow_started_time = time.gmtime(time.time())
         router.post_instance_workflow(org_id=self.organizationId, instance_id=self.instanceId, wf_name=name, data=json.dumps(parameters))
         return True
 
@@ -171,19 +163,26 @@ class Instance(ServiceMixin):
         return router.post_application_refresh(org_id=self.organizationId, app_id=self.applicationId).json()
 
     def reconfigure(self, revision=None, parameters=None):
-        if not parameters: parameters = {}
-        if isinstance(revision, Revision):
-            revisionId = revision.revisionId
-        else:
-            revisionId = ''
-        submodules = parameters.get('submodules', {})
+        #note: be carefull refactoring this, or you might have unpredictable results
+        #todo: private api seems requires at least presence of submodule names if exist
+        payload = {}
+        payload['parameters'] = self.parameters
 
-        payload = json.dumps({
-                   'parameters': parameters,
-                   'submodules': submodules,
-                   'revisionId': revisionId})
-        resp = router.put_instance_configuration(org_id=self.organizationId, instance_id=self.instanceId, data=payload)
+        if revision:
+            payload['revisionId'] = revision.revisionId
+
+        submodules = (parameters or {}).pop('submodules', None)
+        if submodules:
+            payload['submodules'] = submodules
+        if parameters is not None:
+            payload['parameters'] = parameters
+
+        resp = router.put_instance_configuration(org_id=self.organizationId, instance_id=self.instanceId, data=json.dumps(payload))
         return resp.json()
+
+    def rename(self, name):
+        payload = json.dumps({'instanceName': name})
+        return router.put_instance_configuration(org_id=self.organizationId, instance_id=self.instanceId, data=payload)
 
     def delete(self):
         self.destroy()
@@ -210,6 +209,36 @@ class Instance(ServiceMixin):
     @property
     def serviceId(self):
         raise AttributeError("Service is instance reference now, use instanceId")
+
+    @property
+    def most_recent_update_time(self):
+        """
+        Indicated most recent update of the instance, assumption based on:
+        - if currentWorkflow exists, its startedAt time is most recent update.
+        - else max of workflowHistory startedAt is most recent update.
+        """
+        parse_time = lambda t: time.gmtime(t/1000)
+        j = self.json()
+        cw_started_at = j.get('startedAt')
+        if cw_started_at: return parse_time(cw_started_at)
+        try:
+            max_wf_started_at = max([i['startedAt'] for i in j['workflowHistory']])
+            return parse_time(max_wf_started_at)
+        except ValueError:
+            return None
+
+    def _is_projection_updated_instance(self):
+        """
+        This method tries to guess if instance was update since last time.
+        If return True, definitely Yes, if False, this means more unknonw
+        :return: bool
+        """
+        last = self._last_workflow_started_time
+        most_recent = self.most_recent_update_time
+        if last and most_recent:
+            return last < most_recent
+        return False  # can be more clever
+
 
 class InstanceList(QubellEntityList):
     base_clz = Instance
