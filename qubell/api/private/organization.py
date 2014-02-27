@@ -286,6 +286,10 @@ class Organization(object):
 
     service = get_or_create_service
 
+    def remove_service(self, service):
+        service.environment.remove_service(service)
+        service.delete()
+
 ### ENVIRONMENT
     def create_environment(self, name, default=False, zone=None):
         """ Creates environment and returns Environment object.
