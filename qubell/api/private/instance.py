@@ -123,6 +123,7 @@ class Instance(Entity, ServiceMixin):
 
     @staticmethod
     def new(application, revision=None, environment=None, name=None, parameters=None, destroyInterval=None):
+
         if not parameters: parameters = {}
         if environment:  # if environment set, it overrides parameter
             parameters['environmentId'] = environment.environmentId

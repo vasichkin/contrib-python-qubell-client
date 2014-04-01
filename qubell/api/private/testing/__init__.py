@@ -179,7 +179,12 @@ class BaseTestCase(unittest.TestCase):
                 envs.update({key: value})
 
         else:
-            envs = {"default": {}}
+            envs = [{"name": "default",
+                     "provider": cls.parameters['provider_name'],
+                     "services":
+                        [{"name": "Default credentials service"},
+                         {"name": "Default workflow service"}
+                        ]}]
 
         servs = [{"type": COBALT_SECURE_STORE_TYPE, "name": 'Default credentials service'},
                  {"type": WORKFLOW_SERVICE_TYPE, "name": 'Default workflow service', "parameters": {'configuration.policies': '{}'}}]
@@ -201,16 +206,13 @@ class BaseTestCase(unittest.TestCase):
             "environments": envs}
 
     @classmethod
-    def apps(cls):
-        return []
-
-    @classmethod
     def timeout(cls):
         return 15
 
     @classmethod
     def setUpClass(cls):
         super(BaseTestCase, cls).setUpClass()
+
         if cls.parameters['organization']:
             cls.prepare(cls.parameters['organization'], cls.timeout())
         else:
@@ -218,28 +220,43 @@ class BaseTestCase(unittest.TestCase):
 
     @classmethod
     def prepare(cls, organization, timeout=30):
+        """ Create sandboxed test environment
+        """
         cls.sandbox = SandBox(cls.platform, cls.environment(organization))
         cls.organization = cls.sandbox.make()
 
-        cls.instances = []
+        cls.instances = cls.organization.instances
+
+        def launch_in_env(app, env):
+            environment = cls.organization.environments[env['name']]
+            application = cls.organization.applications[app['name']]
+            parameters = app.get('parameters', {})
+            instance = cls.organization.create_instance(application=application,
+                                                        environment=environment,
+                                                        parameters=parameters)
+            if app.get('add_as_service', False):
+                environment.add_service(instance)
+            cls.sandbox.sandbox["instances"].append({
+                "id": instance.instanceId,
+                "name": instance.name,
+            })
+            return instance
+
+        def check_instances(instances):
+            for instance in instances:
+                if not instance.ready(timeout=timeout):
+                    # TODO: if instance fails to start during tests, add proper unittest log
+                    cls.sandbox.clean()
+                    assert False, "Instance %s not ready after timeout %s minutes" % (instance.instanceId, timeout)
+
+
+        # launch service instances first
+        instances = []
         for app in cls.sandbox['applications']:
             for env in cls.sandbox['environments']:
                 if app.get('launch', True):
-                    environment = cls.organization.environment(name=env)
-                    parameters = {'parameters': app.get('parameters', {})}
-                    instance = cls.organization.applications[app['name']].launch(
-                        environment=environment, parameters=parameters)
-                    cls.instances.append(instance)
-                    cls.sandbox.sandbox["instances"].append({
-                        "id": instance.instanceId,
-                        "name": instance.name,
-                        "applicationId":  app['id']
-                    })
-
-        for instance in cls.instances:
-            if not instance.ready(timeout=timeout):
-                cls.sandbox.clean()
-                assert False, "Instance %s not ready after timeout" % instance.instanceId
+                    instances.append(launch_in_env(app, env))
+        check_instances(instances)
 
     @classmethod
     def tearDownClass(cls):
@@ -263,80 +280,27 @@ class SandBox(object):
         self.sandbox = sandbox
         self.platform = platform
         self.organization = self.platform.organization(name=self.sandbox["organization"]["name"])
+        self.sandbox['instances'] = sandbox.get('instances', [])
+
 
     @staticmethod
     def load_yaml(platform, yaml_file):
         return SandBox(platform, yaml.safe_load(yaml_file))
 
-    def __service(self, environment, service_data):
-
-        application = self.organization.applications[system_application_types.get(service_data["type"],service_data["type"])]
-        service = self.organization.service(application=application, name=service_data["name"],
-                                            environment=environment,
-                                            parameters=(service_data.get("parameters")))
-        service.ready(1)
-        environment.add_service(service)
-        if COBALT_SECURE_STORE_TYPE is service_data["type"]:
-            key_id = service.regenerate()['id']
-            environment.add_policy({
-                "action": "provisionVms",
-                "parameter": "publicKeyId",
-                "value": key_id
-            })
-        service_data["id"] = service.instanceId
-
-    def __cloud_account(self, environment, provider):
-        cloud = self.organization.provider(parameters=provider, name=provider["name"])
-        environment.add_provider(cloud)
-        provider["id"] = cloud.providerId
-
-    def __application(self, app):
-        manifest = Manifest(**{k: v for k, v in app.iteritems() if k in ["content", "url", "file"]})
-        application = self.organization.application(manifest=manifest, name=app["name"])
-        app["id"] = application.applicationId
-
     def make(self):
         log.info("Preparing sandbox...")
 
-        for name, env in self.sandbox["environments"].items():
-            environment = self.organization.environment(name=name)
-            environment.clean()
-
-            for service in self.sandbox["services"] + env.get('services', []):
-                self.__service(environment, service)
-
-            for provider in self.sandbox["cloudAccounts"] + env.get('cloudAccounts', []):
-                self.__cloud_account(environment, provider)
-
-            for police in env.get('policies', []):
-                environment.add_policy(police)
-
-            for app in self.sandbox["applications"]:
-                self.__application(app)
-
+        self.organization.restore(self.sandbox)
         log.info("Sandbox prepared")
-
         return self.organization
+
 
     def clean(self, timeout=10):
         log.info("Cleaning sandbox...")
 
-        def destroy(test_instances):
-            return_instances = []
-            instances = self.organization.instances
-            for instanceData in test_instances:
-                if instanceData['id'] in instances: #someone may removed it already
-                    instance = instances[instanceData['id']]
-                    instance.destroy()
-                    return_instances.append(instance)
-            return return_instances
-
-        for instance in destroy(self.sandbox['instances']):
-            if not instance.destroyed(timeout):
-                log.error(
-                    "Instance was not destroyed properly {0}: {1}", instance.id, instance.name
-                )
-
+        # TODO
+        # TODO: Need cleaning mechanism
+        # TODO
         log.info("Sandbox cleaned")
 
     def __check_environment_name(self, name):
