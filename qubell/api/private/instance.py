@@ -143,6 +143,7 @@ class Instance(Entity, ServiceMixin):
 
     @staticmethod
     def new(application, revision=None, environment=None, name=None, parameters=None, destroyInterval=None):
+
         if not parameters: parameters = {}
         conf = {}
         conf['parameters'] = parameters

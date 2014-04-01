@@ -26,6 +26,7 @@ __email__ = "vkhomenko@qubell.com"
 
 import logging as log
 import simplejson as json
+import copy
 
 from qubell.api.private.manifest import Manifest
 from qubell.api.private import exceptions
@@ -86,25 +87,38 @@ class Organization(Entity):
         return router.get_organization(org_id=self.organizationId).json()
 
     def restore(self, config):
-
-        for prov in config.get('providers', []):
-            self.get_or_create_provider(id=prov.pop('id', None), name=prov.pop('name'), parameters=prov)
+        config = copy.deepcopy(config)
+        for prov in config.get('cloudAccounts', []):
+            self.get_or_create_provider(id=prov.pop('id', None),
+                                        name=prov.pop('name'),
+                                        parameters=prov)
 
         for serv in config.pop('services',[]):
-            self.get_or_create_service(id=serv.pop('id', None), name=serv.pop('name'), type=serv.pop('type', None), parameters=serv.pop('parameters', None))
+            self.get_or_create_service(id=serv.pop('id', None),
+                                       name=serv.pop('name'),
+                                       type=serv.pop('type', None),
+                                       parameters=serv.pop('parameters', None))
 
         for env in config.pop('environments',[]):
-            restored_env = self.get_or_create_environment(id=env.pop('id', None), name=env.pop('name', 'default'),zone=env.pop('zone', None), default=env.pop('default', False))
-            restored_env.clean()
+            restored_env = self.get_or_create_environment(id=env.pop('id', None),
+                                                          name=env.pop('name', 'default'),
+                                                          zone=env.pop('zone', None),
+                                                          default=env.pop('default', False))
+            #restored_env.clean()
             restored_env.restore(env)
 
         for app in config.pop('applications'):
-            mnf = app.pop('manifest', None)
-            restored_app = self.application(id=app.pop('id', None), manifest=Manifest(**mnf), name=app.pop('name'))
-            #restored_app.restore(app)
+            manifest = Manifest(**{k: v for k, v in app.iteritems() if k in ["content", "url", "file"]})
+            #mnf = app.pop('manifest', None)
+            restored_app = self.application(id=app.pop('id', None),
+                                            manifest=manifest,
+                                            name=app.pop('name'))
 
         for instance in config.pop('instances', []):
-            launched = self.get_or_launch_instance(id=instance.pop('id', None), name=instance.pop('name'), **instance)
+            launched = self.get_or_launch_instance(application=self.get_application(name=instance.pop('application')),
+                                                   id=instance.pop('id', None),
+                                                   name=instance.pop('name', None),
+                                                   **instance)
             assert launched.ready()
 
 ### APPLICATION
