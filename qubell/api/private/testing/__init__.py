@@ -185,6 +185,7 @@ class BaseTestCase(unittest.TestCase):
     @classmethod
     def environment(cls, organization):
 
+        # Default add-on for every env
         addon = {"provider": {"name": cls.parameters['provider_name']},
                  "services":
                     [{"name": DEFAULT_CREDENTIAL_SERVICE()},
@@ -199,21 +200,28 @@ class BaseTestCase(unittest.TestCase):
         servs = [{"type": COBALT_SECURE_STORE_TYPE, "name": DEFAULT_CREDENTIAL_SERVICE()},
                  {"type": WORKFLOW_SERVICE_TYPE, "name": DEFAULT_WORKFLOW_SERVICE()}]
 
+        provs = [{"name": cls.parameters['provider_name'],
+                  "provider": cls.parameters['provider_type'],
+                  "usedEnvironments": [],
+                  "ec2SecurityGroup": "default",
+                  "providerCopy": cls.parameters['provider_type'],
+                  "jcloudsIdentity": cls.parameters['provider_identity'],
+                  "jcloudsCredential": cls.parameters['provider_credential'],
+                  "jcloudsRegions": cls.parameters['provider_region']}]
+        insts = []
+
+        # Add provider, keystore, workflow to every env.
+        envs = cls.environments or [{"name": "default"},]
+        for env in envs:
+            env.update(addon)
+
         return {
             "organization": {"name": organization},
             "services": servs,
-            "instances": [],
-            "cloudAccounts": [{
-                                  "name": cls.parameters['provider_name'],
-                                  "provider": cls.parameters['provider_type'],
-                                  "usedEnvironments": [],
-                                  "ec2SecurityGroup": "default",
-                                  "providerCopy": cls.parameters['provider_type'],
-                                  "jcloudsIdentity": cls.parameters['provider_identity'],
-                                  "jcloudsCredential": cls.parameters['provider_credential'],
-                                  "jcloudsRegions": cls.parameters['provider_region']
-            }],
+            "instances": insts,
+            "cloudAccounts": provs,
             "environments": envs}
+
 
     @classmethod
     def timeout(cls):
