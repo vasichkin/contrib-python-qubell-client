@@ -37,6 +37,7 @@ class InstanceClassTest(BaseTestCase):
 
     @classmethod
     def tearDownClass(cls):
+        cls.app.clean()
         cls.ins.delete()
         super(InstanceClassTest, cls).tearDownClass()
 

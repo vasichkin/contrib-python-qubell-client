@@ -120,3 +120,15 @@ class ApplicationClassTest(BaseTestCase):
         self.assertTrue(revision)
         self.assertTrue(app.clean())
         self.assertTrue(instance.destroyed())
+
+    def test_revision_create_wo_active_instance(self):
+        app = self.app
+
+        revision = app.create_revision(name='test-revision-create-again')
+        self.assertTrue(revision)
+
+        instance = app.launch(revision=revision, destroyInterval=600000)
+        self.assertTrue(instance.ready())
+
+        self.assertTrue(app.clean())
+        self.assertTrue(instance.destroyed())

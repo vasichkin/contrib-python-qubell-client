@@ -93,23 +93,21 @@ class Application(Entity):
         resp = router.put_application(org_id=self.organizationId, app_id=self.applicationId, data=data)
         return resp.json()
 
-    def clean(self, timeout=3):
-        for ins in self.instances:
-            st = ins.status
-            if st not in ['Destroyed', 'Destroying']: # Tests could fail and we can get any state here
-                log.info("Cleaning application %s (%s)" % (self.name, self.applicationId))
+    def clean(self, timeout=[7, 1, 1.5]):
+        instances = self.instances
+        log.info("Cleaning application %s (%s)" % (self.name, self.applicationId))
+        for ins in instances:
+            if ins.status not in ['Destroyed', 'Destroying']:
                 ins.destroy()
-                self.instances.remove(ins)
+
+        @retry(*timeout, retry_exception=AssertionError)
+        def eventually_clean():
+            for ins in instances:
+                assert ins.status == 'Destroyed'
+        eventually_clean()
 
         for rev in self.revisions:
-            self.revisions.remove(rev)
             rev.delete()
-        @retry(10, 1, 2 , AssertionError)
-        def eventually_clean():
-            for ins in self.instances:
-                assert ins.status == 'Destroyed'
-
-        eventually_clean()
         return True
 
     def json(self):
@@ -135,19 +133,29 @@ class Application(Entity):
     def list_revisions_json(self):
         return self.json()['revisions']
 
-    def create_revision(self, name, instance, parameters=[], version=None):
+    def create_revision(self, name, instance=None, parameters=[], version=None):
         if not version:
             version=self.get_manifest()['manifestVersion']
-        payload = json.dumps({ 'name': name,
-                    'parameters': parameters,
-                    'submoduleRevisions': {},
-                    'returnValues': [],
-                    'applicationId': self.applicationId,
-                    'applicationName': self.name,
-                    'version': version,
-                    'instanceId': instance.instanceId})
-        resp = router.post_revision(org_id=self.organizationId, app_id=self.applicationId, data=payload)
-        return self.get_revision(id=resp.json()['id'])
+        if instance:
+            payload = json.dumps({ 'name': name,
+                        'parameters': parameters,
+                        'submoduleRevisions': {},
+                        'returnValues': [],
+                        'applicationId': self.applicationId,
+                        'applicationName': self.name,
+                        'version': version,
+                        'instanceId': instance.instanceId})
+            resp = router.post_revision(org_id=self.organizationId, app_id=self.applicationId, data=payload)
+            return self.get_revision(id=resp.json()['id'])
+        else:
+
+            payload = json.dumps({ 'name': name,
+                            'parameters': parameters,
+                            'submodules': [],
+                            'applicationId': self.applicationId,
+                            'version': version,})
+            resp = router.post_revision_fs(org_id=self.organizationId, app_id=self.applicationId, data=payload)
+            return self.get_revision(id=resp.json()['id'])
 
     def delete_revision(self, id):
         self.get_revision(id).delete()
