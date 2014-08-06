@@ -331,19 +331,21 @@ class Instance(Entity, ServiceMixin):
             return last < most_recent
         return False  # can be more clever
 
-
 class InstanceList(QubellEntityList):
     base_clz = Instance
 
 class activityLog(object):
+    TYPES=['status updated', 'signals updated', 'command started', 'command finished', 'workflow started', 'workflow finished', 'step started', 'step finished']
     log=[]
     def __init__(self, log, severity=None, start=None, end=None):
-        self.log = log
-        self.sort()
+        def sort(log):
+            return sorted(log, key=lambda x: x['time'], reverse=False)
+
+        self.log = sort(log)
         self.severity = severity
         if severity:
             self.log = [x for x in self.log if x['severity'] in severity]
-            self.severity=severity
+            self.severity = severity
 
         if start:
             self.log = [x for x in self.log if x['time']>=start]
@@ -360,7 +362,7 @@ class activityLog(object):
     def __str__(self):
         text = 'Severity: %s' % self.severity or 'ALL'
         for x in self.log:
-            text += '\n{0}: {1}'.format(x['time'], x['description'].replace('\n', '\n\t\t'))
+            text += '\n{0}: {1}: {2}'.format(x['time'], x['eventTypeText'], x['description'].replace('\n', '\n\t\t'))
         return text
 
     def __contains__(self, item):
@@ -376,20 +378,36 @@ class activityLog(object):
 
         if isinstance(item, int):
             if item>1000000000000:
-                return [x['description'] for x in self.log if x['time']==item][0]
-            return self.log[item]['description']
+                return ['{0}: {1}'.format(x['eventTypeText'], x['description']) for x in self.log if x['time']==item][0]
+            return '{0}: {1}'.format(self.log[item]['eventTypeText'], self.log[item]['description'])
         elif isinstance(item, str):
             return self.find(item)[0]
         return False
 
-    def find(self, item):
+    def find(self, item, description='', event_type=''):
         """ Find regexp in activitylog
+        find record as if type are in description.
+        #TODO: should be refactored, dumb logic
         """
-        found = [x['time'] for x in self.log if re.search(item, x['description'])]
+        if ': ' in item:
+            splited = item.split(': ', 1)
+            if splited[0] in self.TYPES:
+                description = item.split(': ')[1]
+                event_type = item.split(': ')[0]
+            else:
+                description = item
+        else:
+            if not description:
+                description = item
+
+        if event_type:
+            found = [x['time'] for x in self.log if re.search(description, x['description']) and x['eventTypeText']==event_type]
+        else:
+            found = [x['time'] for x in self.log if re.search(description, x['description'])]
 
         if len(found):
             return found
-        raise exceptions.ApiNotFoundError('Cannot find activity log entry: %s' % item)
+        raise exceptions.ApiNotFoundError('Cannot find activity log entry: %s: %s' % (event_type, description))
 
 
     def get_interval(self, start_text=None, end_text=None):
@@ -407,5 +425,3 @@ class activityLog(object):
             return interval
         raise exceptions.NotFoundError('Activitylog interval not found: [%s , %s]' % (start_text, end_text))
 
-    def sort(self):
-        self.log = sorted(self.log, key=lambda x: x['time'], reverse=False)
