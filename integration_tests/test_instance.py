@@ -32,7 +32,7 @@ class InstanceClassTest(BaseTestCase):
         super(InstanceClassTest, cls).setUpClass()
         cls.org = cls.organization
         cls.app = cls.org.application(manifest=cls.manifest, name='Self-InstanceClassTest')
-        cls.ins = cls.org.create_instance(application=cls.app, name='Self-InstanceClassTest-Instance', destroyInterval=300000)
+        cls.ins = cls.org.create_instance(application=cls.app, name='Self-InstanceClassTest-Instance')
         assert cls.ins.ready()
 
     @classmethod
@@ -162,18 +162,19 @@ class InstanceClassTest(BaseTestCase):
             assert log['severity'] == 'INFO'
 
         assert 'Running' in info_logs
-        self.assertRegexpMatches(all_logs[0], '.* started \'launch\' \(.*\)')
+        self.assertRegexpMatches(all_logs[0], 'command started: \'launch\' \(.*\) by .*')
         @eventually(AssertionError, MismatchError)
         def assert_eventually():
             # Last line could be one og this.
-            self.assertTrue((all_logs[-1] == 'Running') or (all_logs[-1] == "Finished workflow 'launch' with status 'Succeeded'"))
+            self.assertTrue((all_logs[-1] == 'status updated: Running') or (all_logs[-1] == "command finished: 'launch'") or all_logs[-1] == "signals updated: This is default manifest")
         assert_eventually()
 
-        self.assertRegexpMatches(info_logs[0], '.* started \'launch\' \(.*\)')
-        assert 'Started workflow: launch' in info_logs
-        assert 'Dynamic links updated' in all_logs
+        self.assertRegexpMatches(info_logs[0], 'command started: \'launch\' \(.*\) by .*')
+        assert 'workflow started: launch' in info_logs
+        assert 'signals updated: This is default manifest' in all_logs
+        assert 'This is default manifest' in all_logs
 
-        interval = info_logs.get_interval("Started workflow: launch", "Finished workflow 'launch' with status 'Succeeded'")
+        interval = info_logs.get_interval(start_text="workflow started: launch", end_text="workflow finished: launch with status \'Succeeded\'")
         # there could be 3 or 4 messages
         self.assertTrue(len(interval) in [3, 4], interval)
 
