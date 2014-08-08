@@ -176,7 +176,7 @@ class InstanceClassTest(BaseTestCase):
 
         interval = info_logs.get_interval(start_text="workflow started: launch", end_text="workflow finished: launch with status \'Succeeded\'")
         # there could be 3 or 4 messages
-        self.assertTrue(len(interval) in [3, 4], interval)
+        self.assertTrue(len(interval) in [2, 3, 4], interval)
 
 
     """

@@ -335,7 +335,7 @@ class InstanceList(QubellEntityList):
     base_clz = Instance
 
 class activityLog(object):
-    TYPES=['status updated', 'signals updated', 'command started', 'command finished', 'workflow started', 'workflow finished', 'step started', 'step finished']
+    TYPES=['status updated', 'signals updated', 'dynamic links updated', 'command started', 'command finished', 'workflow started', 'workflow finished', 'step started', 'step finished']
     log=[]
     def __init__(self, log, severity=None, start=None, end=None):
         def sort(log):
@@ -345,7 +345,6 @@ class activityLog(object):
         self.severity = severity
         if severity:
             self.log = [x for x in self.log if x['severity'] in severity]
-            self.severity = severity
 
         if start:
             self.log = [x for x in self.log if x['time']>=start]
@@ -362,7 +361,10 @@ class activityLog(object):
     def __str__(self):
         text = 'Severity: %s' % self.severity or 'ALL'
         for x in self.log:
-            text += '\n{0}: {1}: {2}'.format(x['time'], x['eventTypeText'], x['description'].replace('\n', '\n\t\t'))
+            try:
+                text += '\n{0}: {1}: {2}'.format(x['time'], x['eventTypeText'], x['description'].replace('\n', '\n\t\t'))
+            except KeyError:
+                text += '\n{0}: {2}'.format(x['time'], x['description'].replace('\n', '\n\t\t'))
         return text
 
     def __contains__(self, item):
@@ -419,7 +421,7 @@ class activityLog(object):
 
         if end_text:
             end = interval.find(end_text)
-            interval = activityLog(self.log, self.severity, end=end[0])
+            interval = activityLog(interval, self.severity, end=end[0])
 
         if len(interval):
             return interval
