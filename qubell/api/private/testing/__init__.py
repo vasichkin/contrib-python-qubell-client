@@ -23,12 +23,11 @@ import unittest
 import yaml
 import logging as log
 import re
-import os
 
 from functools import wraps
 
 from qubell.api.globals import *
-from qubell.api.private.service import system_application_types, COBALT_SECURE_STORE_TYPE, WORKFLOW_SERVICE_TYPE
+from qubell.api.private.service import COBALT_SECURE_STORE_TYPE, WORKFLOW_SERVICE_TYPE, CLOUD_ACCOUNT_TYPE
 
 import logging
 import types
@@ -184,34 +183,28 @@ class BaseTestCase(unittest.TestCase):
 
     @classmethod
     def environment(cls, organization):
+        provider_config = {'configuration.provider': cls.parameters['provider_type'],
+                           'configuration.legacy-regions': cls.parameters['provider_region'],
+                           'configuration.endpoint-url': '',
+                           'configuration.legacy-security-group': '',
+                           'configuration.identity': cls.parameters['provider_identity'],
+                           'configuration.credential': cls.parameters['provider_credential']}
 
         # Default add-on for every env
-        addon = {"provider": {"name": cls.parameters['provider_name']},
-                 "services":
+        addon = {"services":
                     [{"name": DEFAULT_CREDENTIAL_SERVICE()},
-                     {"name": DEFAULT_WORKFLOW_SERVICE()}
+                     {"name": DEFAULT_WORKFLOW_SERVICE()},
+                     {"name": cls.parameters['provider_name']}
                     ]}
 
-        envs = cls.environments or [{"name": DEFAULT_ENV_NAME()},]
-
-        for env in envs:
-            env.update(addon)  # Add provider, keystore, workflow to every env.
-
         servs = [{"type": COBALT_SECURE_STORE_TYPE, "name": DEFAULT_CREDENTIAL_SERVICE()},
-                 {"type": WORKFLOW_SERVICE_TYPE, "name": DEFAULT_WORKFLOW_SERVICE()}]
+                 {"type": WORKFLOW_SERVICE_TYPE, "name": DEFAULT_WORKFLOW_SERVICE()},
+                 {"type": CLOUD_ACCOUNT_TYPE, "name": cls.parameters['provider_name'], "parameters": provider_config}]
 
-        provs = [{"name": cls.parameters['provider_name'],
-                  "provider": cls.parameters['provider_type'],
-                  "usedEnvironments": [],
-                  "ec2SecurityGroup": "default",
-                  "providerCopy": cls.parameters['provider_type'],
-                  "jcloudsIdentity": cls.parameters['provider_identity'],
-                  "jcloudsCredential": cls.parameters['provider_credential'],
-                  "jcloudsRegions": cls.parameters['provider_region']}]
         insts = []
 
         # Add provider, keystore, workflow to every env.
-        envs = cls.environments or [{"name": "default"},]
+        envs = cls.environments or [{"name": DEFAULT_ENV_NAME()},]
         for env in envs:
             env.update(addon)
 
@@ -219,9 +212,7 @@ class BaseTestCase(unittest.TestCase):
             "organization": {"name": organization},
             "services": servs,
             "instances": insts,
-            "cloudAccounts": provs,
             "environments": envs}
-
 
     @classmethod
     def timeout(cls):

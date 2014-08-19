@@ -100,6 +100,7 @@ class Organization(Entity):
 
     def restore(self, config, clean=False, timeout=10):
         config = copy.deepcopy(config)
+        # Deprecated
         for prov in config.get('cloudAccounts', []):
             self.provider(id=prov.pop('id', None),
                                         name=prov.pop('name'),

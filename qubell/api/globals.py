@@ -22,5 +22,6 @@ PROVIDER = {
     'provider_type': os.getenv('PROVIDER_TYPE', 'aws-ec2'),
     'provider_identity': os.getenv('PROVIDER_IDENTITY', 'FAKE'),
     'provider_credential': os.getenv('PROVIDER_CREDENTIAL', 'FAKE'),
-    'provider_region': os.getenv('PROVIDER_REGION', 'us-east-1')
+    'provider_region': os.getenv('PROVIDER_REGION', 'us-east-1'),
+    'provider_security_group': os.getenv('PROVIDER_SECURITY_GROUP', '')
 }
