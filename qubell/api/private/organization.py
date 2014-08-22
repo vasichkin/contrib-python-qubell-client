@@ -95,8 +95,9 @@ class Organization(Entity):
 
     def ready(self):
         env = self.environments[DEFAULT_ENV_NAME()]
-        assert env.services[DEFAULT_WORKFLOW_SERVICE()].ready()
-        assert env.services[DEFAULT_CREDENTIAL_SERVICE()].ready()
+        if env.services[DEFAULT_WORKFLOW_SERVICE()].ready() and env.services[DEFAULT_CREDENTIAL_SERVICE()].ready():
+            return True
+        return False
 
     def restore(self, config, clean=False, timeout=10):
         config = copy.deepcopy(config)
