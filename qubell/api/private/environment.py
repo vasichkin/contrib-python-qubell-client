@@ -41,7 +41,6 @@ class Environment(Entity):
         self.policies = []
         self.markers = []
         self.properties = []
-        self.providers = []
 
     @lazyproperty
     def zoneId(self):
@@ -91,14 +90,11 @@ class Environment(Entity):
             self.add_policy(policy)
         for property in config.pop('properties', []):
             self.add_property(**property)
-        if config.get('cloudAccount', None) or config.get('provider', None):
-            provider = config.get('cloudAccount') or config.get('provider')
-            prov = self.organization.get_provider(id=provider.pop('id', None), name=provider.pop('name'))
-            self.add_provider(prov)
         for service in config.pop('services', []):
             type=service.pop('type', None)
             serv = self.organization.get_service(id=service.pop('id', None), name=service.pop('name'))
-            self.add_service(serv)
+            if not serv in self.services:
+                self.add_service(serv)
         for service in self.services:
             service.ready()
 
@@ -211,19 +207,6 @@ class Environment(Entity):
         return resp.json()
 
     def remove_policy(self):
-        raise NotImplementedError
-
-    def add_provider(self, provider):
-        time.sleep(0.5) # TODO: Need to wait until strategy comes up
-        data = self.json()
-        data.update({'providerId': provider.providerId})
-
-        log.info("Setting provider %s (%s) for environment %s (%s)" % (provider.name, provider.providerId, self.name, self.id))
-        resp = self._put_environment(data=json.dumps(data))
-        self.providers.append(provider)
-        return resp.json()
-
-    def remove_provider(self):
         raise NotImplementedError
 
     def set_backend(self, zone):

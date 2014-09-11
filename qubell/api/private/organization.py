@@ -35,7 +35,6 @@ from qubell.api.private.instance import InstanceList, DEAD_STATUS, Instance
 from qubell.api.private.application import ApplicationList
 from qubell.api.private.environment import EnvironmentList
 from qubell.api.private.zone import ZoneList
-from qubell.api.private.provider import ProviderList
 from qubell.api.provider.router import ROUTER as router
 from qubell.api.private.common import QubellEntityList, Entity
 from qubell.api.globals import *
@@ -75,9 +74,6 @@ class Organization(Entity):
     @lazyproperty
     def zones(self): return ZoneList(self)
 
-    @lazyproperty
-    def providers(self): return ProviderList(self)
-
     @property
     def defaultEnvironment(self): return self.get_default_environment()
 
@@ -95,20 +91,12 @@ class Organization(Entity):
 
     def ready(self):
         env = self.environments[DEFAULT_ENV_NAME()]
-        assert env.services[DEFAULT_WORKFLOW_SERVICE()].ready()
-        assert env.services[DEFAULT_CREDENTIAL_SERVICE()].ready()
+        if env.services[DEFAULT_WORKFLOW_SERVICE()].ready() and env.services[DEFAULT_CREDENTIAL_SERVICE()].ready():
+            return True
+        return False
 
     def restore(self, config, clean=False, timeout=10):
         config = copy.deepcopy(config)
-        for prov in config.get('cloudAccounts', []):
-            self.provider(id=prov.pop('id', None),
-                                        name=prov.pop('name'),
-                                        parameters=prov)
-        # Deprecated, but maybe still used
-        for prov in config.get('providers', []):
-            self.provider(id=prov.pop('id', None),
-                                        name=prov.pop('name'),
-                                        parameters=prov)
 
         for app in config.pop('applications'):
             manifest_param = {k: v for k, v in app.iteritems() if k in ["content", "url", "file"]}
@@ -409,45 +397,6 @@ class Organization(Entity):
     def set_default_environment(self, environment):
         return environment.set_as_default()
 
-
-### PROVIDER
-    def create_provider(self, name, parameters):
-        log.info("Creating provider: %s" % name)
-        log.debug(parameters)
-        parameters['name'] = name
-        resp = router.post_organization_provider(org_id=self.organizationId, data=json.dumps(parameters))
-        return self.get_provider(resp.json()['id'])
-
-    def list_providers_json(self):
-        return router.get_providers(org_id=self.organizationId).json()
-
-    def get_provider(self, id=None, name=None):
-        log.info("Picking provider: %s (%s)" % (name, id))
-        return self.providers[id or name]
-
-    def delete_provider(self, id):
-        prov = self.get_provider(id)
-        return prov.delete()
-
-    def get_or_create_provider(self, id=None, name=None, parameters=None):
-        """ Get or create provider
-        """
-        assert id or name
-        try:
-            return self.get_provider(id=id, name=name)
-        except exceptions.NotFoundError:
-            return self.create_provider(name, parameters)
-
-    def provider(self, id=None, name=None, parameters=None):
-        """ (Get and set) or create provider
-        """
-        assert id or name
-        try:
-            provider = self.get_provider(id=id, name=name)
-            provider.update(name=name or provider.name, parameters=parameters)
-            return provider
-        except exceptions.NotFoundError:
-            return self.create_provider(name, parameters)
 
 ### ZONES
 

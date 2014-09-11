@@ -69,12 +69,7 @@ class ServiceClassTest(BaseTestCase):
         self.assertFalse(serv in self.org.services)
         self.assertFalse(serv in self.environment.services)
 
-    def test_create_keystore_service(self):
-        """ Check keystore service could be created
-        """
-        from qubell.api.private.service import COBALT_SECURE_STORE_TYPE
-        serv = self.org.create_service(type=COBALT_SECURE_STORE_TYPE, environment=self.env)
-
+    def check_service(self, serv):
         self.assertTrue(serv.ready())
         self.assertTrue(serv in self.org.services)
         self.assertTrue(serv in self.org.instances)
@@ -86,57 +81,44 @@ class ServiceClassTest(BaseTestCase):
         self.assertTrue(serv.destroyed())
         self.assertFalse(serv in self.org.services)
         self.assertFalse(serv in self.env.services)
+
+    def test_create_keystore_service(self):
+        """ Check keystore service could be created
+        """
+        from qubell.api.private.service import COBALT_SECURE_STORE_TYPE
+        serv = self.org.create_service(type=COBALT_SECURE_STORE_TYPE, environment=self.env)
+        self.check_service(serv)
 
     def test_create_workflow_service(self):
         """ Check workflow service could be created
         """
         from qubell.api.private.service import WORKFLOW_SERVICE_TYPE
         serv = self.org.create_service(type=WORKFLOW_SERVICE_TYPE, environment=self.env)
-
-        self.assertTrue(serv.ready())
-        self.assertTrue(serv in self.org.services)
-        self.assertTrue(serv in self.org.instances)
-        self.assertFalse(serv.destroyAt) # Service has no destroy interval
-        self.assertTrue(serv in self.env.services)
-
-        # clean
-        self.assertTrue(serv.delete())
-        self.assertTrue(serv.destroyed())
-        self.assertFalse(serv in self.org.services)
-        self.assertFalse(serv in self.env.services)
+        self.check_service(serv)
 
     def test_create_shared_service(self):
         """ Check shared instance catalog service could be created
         """
         from qubell.api.private.service import SHARED_INSTANCE_CATALOG_TYPE
         serv = self.org.create_service(type=SHARED_INSTANCE_CATALOG_TYPE, environment=self.env, parameters={'configuration.shared-instances':{}})
-
-        self.assertTrue(serv.ready())
-        self.assertTrue(serv in self.org.services)
-        self.assertTrue(serv in self.org.instances)
-        self.assertFalse(serv.destroyAt) # Service has no destroy interval
-        self.assertTrue(serv in self.env.services)
-
-        # clean
-        self.assertTrue(serv.delete())
-        self.assertTrue(serv.destroyed())
-        self.assertFalse(serv in self.org.services)
-        self.assertFalse(serv in self.env.services)
+        self.check_service(serv)
 
     def test_create_resource_pool_service(self):
         """ Check resource pool service could be created
         """
         from qubell.api.private.service import STATIC_RESOURCE_POOL_TYPE
         serv = self.org.create_service(type=STATIC_RESOURCE_POOL_TYPE, environment=self.env, parameters={'configuration.resources':{}})
+        self.check_service(serv)
 
-        self.assertTrue(serv.ready())
-        self.assertTrue(serv in self.org.services)
-        self.assertTrue(serv in self.org.instances)
-        self.assertFalse(serv.destroyAt) # Service has no destroy interval
-        self.assertTrue(serv in self.env.services)
-
-        # clean
-        self.assertTrue(serv.delete())
-        self.assertTrue(serv.destroyed())
-        self.assertFalse(serv in self.org.services)
-        self.assertFalse(serv in self.env.services)
+    def test_create_cloud_account_service(self):
+        """ Check cloud account service could be created
+        """
+        from qubell.api.private.service import CLOUD_ACCOUNT_TYPE
+        provider_config = {'configuration.provider': 'aws-ec2',
+                           'configuration.legacy-regions': 'us-east-1',
+                           'configuration.endpoint-url': '',
+                           'configuration.legacy-security-group': '',
+                           'configuration.identity': 'TEST_IDENT',
+                           'configuration.credential': 'TEST_CRED'}
+        serv = self.org.create_service(type=CLOUD_ACCOUNT_TYPE, environment=self.env, parameters=provider_config)
+        self.check_service(serv)

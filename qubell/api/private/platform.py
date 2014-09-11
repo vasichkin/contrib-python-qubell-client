@@ -74,7 +74,7 @@ class QubellPlatform(object):
 
     def create_organization(self, name):
         org = Organization.new(name)
-        org.ready()
+        assert org.ready()
         return org
 
     def get_organization(self, id=None, name=None):

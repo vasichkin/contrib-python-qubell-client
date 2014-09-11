@@ -23,15 +23,16 @@ import unittest
 import yaml
 import logging as log
 import re
-import os
 
 from functools import wraps
 
 from qubell.api.globals import *
-from qubell.api.private.service import system_application_types, COBALT_SECURE_STORE_TYPE, WORKFLOW_SERVICE_TYPE
+from qubell.api.private.service import COBALT_SECURE_STORE_TYPE, WORKFLOW_SERVICE_TYPE, CLOUD_ACCOUNT_TYPE
 
 import logging
 import types
+
+import requests
 
 logging.getLogger("requests.packages.urllib3.connectionpool").setLevel(logging.ERROR)
 
@@ -184,35 +185,41 @@ class BaseTestCase(unittest.TestCase):
 
     @classmethod
     def environment(cls, organization):
+        provider_config = {'configuration.provider': cls.parameters['provider_type'],
+                           'configuration.legacy-regions': cls.parameters['provider_region'],
+                           'configuration.endpoint-url': '',
+                           'configuration.legacy-security-group': '',
+                           'configuration.identity': cls.parameters['provider_identity'],
+                           'configuration.credential': cls.parameters['provider_credential']}
 
-        addon = {"provider": {"name": cls.parameters['provider_name']},
-                 "services":
+        # Old style components tests declared name as 'test-provider'. Now we cannot add this provider to env where another provider set.
+        if (cls.parameters['provider_name']=='test-provider') or (not(cls.parameters['provider_name'])):
+            prov = PROVIDER['provider_name']
+        else:
+            prov = cls.parameters['provider_name']
+
+        # Default add-on for every env
+        addon = {"services":
                     [{"name": DEFAULT_CREDENTIAL_SERVICE()},
-                     {"name": DEFAULT_WORKFLOW_SERVICE()}
+                     {"name": DEFAULT_WORKFLOW_SERVICE()},
+                     {"name": prov}
                     ]}
 
-        envs = cls.environments or [{"name": DEFAULT_ENV_NAME()},]
-
-        for env in envs:
-            env.update(addon)  # Add provider, keystore, workflow to every env.
-
         servs = [{"type": COBALT_SECURE_STORE_TYPE, "name": DEFAULT_CREDENTIAL_SERVICE()},
-                 {"type": WORKFLOW_SERVICE_TYPE, "name": DEFAULT_WORKFLOW_SERVICE()}]
+                 {"type": WORKFLOW_SERVICE_TYPE, "name": DEFAULT_WORKFLOW_SERVICE()},
+                 {"type": CLOUD_ACCOUNT_TYPE, "name": prov, "parameters": provider_config}]
+
+        insts = []
+
+        # Add provider, keystore, workflow to every env.
+        envs = cls.environments or [{"name": DEFAULT_ENV_NAME()},]
+        for env in envs:
+            env.update(addon)
 
         return {
             "organization": {"name": organization},
             "services": servs,
-            "instances": [],
-            "cloudAccounts": [{
-                                  "name": cls.parameters['provider_name'],
-                                  "provider": cls.parameters['provider_type'],
-                                  "usedEnvironments": [],
-                                  "ec2SecurityGroup": "default",
-                                  "providerCopy": cls.parameters['provider_type'],
-                                  "jcloudsIdentity": cls.parameters['provider_identity'],
-                                  "jcloudsCredential": cls.parameters['provider_credential'],
-                                  "jcloudsRegions": cls.parameters['provider_region']
-            }],
+            "instances": insts,
             "environments": envs}
 
     @classmethod
@@ -242,6 +249,22 @@ class BaseTestCase(unittest.TestCase):
         """
         log.info("\n\n\n---------------  Preparing sandbox...  ---------------")
         cls.sandbox = SandBox(cls.platform, cls.environment(organization))
+
+        # If 'meta' in sandbox, restore applications that comes in meta before.
+        applications = []
+        org = cls.platform.get_organization(name=cls.sandbox['organization']['name'])
+        if cls.__dict__.get('meta'):
+            meta_raw = requests.get(url=cls.__dict__.get('meta'))
+            log.info("Got meta: %s" % meta_raw)
+            meta = yaml.safe_load(meta_raw.content)
+            for app in meta['kit']['applications']:
+                applications.append({
+                    'name': app['name'],
+                    'url': app['manifest']})
+            log.info("Restoring: %s" % applications)
+            org.restore({'applications': applications})
+
+
         cls.organization = cls.sandbox.make()
         cls.regular_instances = []
         cls.service_instances = []

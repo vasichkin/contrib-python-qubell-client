@@ -147,7 +147,6 @@ def dump(node):
     from qubell.api.private.application import Application
     from qubell.api.private.instance import Instance
     from qubell.api.private.revision import Revision
-    from qubell.api.private.provider import Provider
     from qubell.api.private.environment import Environment
     from qubell.api.private.zone import Zone
     from qubell.api.private.manifest import Manifest
@@ -162,7 +161,6 @@ def dump(node):
         Instance: ['auth', 'instanceId', 'application'],
         Manifest: ['name', 'content'],
         Revision: ['auth', 'revisionId'],
-        Provider: ['auth', 'providerId', 'organization'],
         Environment: ['auth', 'environmentId', 'organization'],
         Zone: ['auth', 'zoneId', 'organization'],
     }
