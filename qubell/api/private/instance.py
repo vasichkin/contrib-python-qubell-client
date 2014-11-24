@@ -34,7 +34,7 @@ from qubell.api.private import exceptions
 from qubell.api.private.common import QubellEntityList, Entity
 from qubell.api.provider.router import ROUTER as router
 
-DEAD_STATUS = ['Destroyed', 'Destroying']
+DEAD_STATUS = ['Destroyed']
 
 class Instance(Entity, ServiceMixin):
     """
@@ -200,9 +200,17 @@ class Instance(Entity, ServiceMixin):
         return waitForStatus(instance=self, final='Running', accepted=['Launching', 'Requested', 'Executing', 'Unknown'], timeout=[timeout*20, 3, 1])
         # TODO: Unknown status  should be removed
 
-        #TODO: not available
+    def running(self, timeout=3):
+        if self.status == 'Running':
+            log.debug("Instance {} is Running right now".format(self.id))
+            return True
+        mrut = self.most_recent_update_time
+        if mrut:
+            self._last_workflow_started_time = time.gmtime(time.mktime(mrut) - 1)  # skips projection check
+        return self.ready(timeout)
+
     def destroyed(self, timeout=3):  # Shortcut for convinience. Temeout = 3 min (ask timeout*6 times every 10 sec)
-        return waitForStatus(instance=self, final='Destroyed', accepted=['Destroying', 'Running'], timeout=[timeout*20, 3, 1])
+        return waitForStatus(instance=self, final='Destroyed', accepted=['Destroying', 'Running', 'Executing'], timeout=[timeout*20, 3, 1])
 
     def run_workflow(self, name, parameters=None):
         if not parameters: parameters = {}
@@ -308,9 +316,12 @@ class Instance(Entity, ServiceMixin):
         """
         parse_time = lambda t: time.gmtime(t/1000)
         j = self.json()
-        cw_started_at = j.get('startedAt')
-        if cw_started_at: return parse_time(cw_started_at)
         try:
+            if j['currentWorkflow']:
+                cw_started_at = j['currentWorkflow']['startedAt']
+                if cw_started_at:
+                    return parse_time(cw_started_at)
+
             max_wf_started_at = max([i['startedAt'] for i in j['workflowHistory']])
             return parse_time(max_wf_started_at)
         except ValueError:
@@ -319,7 +330,7 @@ class Instance(Entity, ServiceMixin):
     def _is_projection_updated_instance(self):
         """
         This method tries to guess if instance was update since last time.
-        If return True, definitely Yes, if False, this means more unknonw
+        If return True, definitely Yes, if False, this means more unknown
         :return: bool
         """
         last = self._last_workflow_started_time
@@ -368,7 +379,7 @@ class activityLog(object):
         return text
 
     def __contains__(self, item):
-        return len(self.find(item))
+        return True if self.find(item) else False
 
     def __getitem__(self, item):
         """
@@ -407,10 +418,7 @@ class activityLog(object):
         else:
             found = [x['time'] for x in self.log if re.search(description, x['description'])]
 
-        if len(found):
-            return found
-        raise exceptions.ApiNotFoundError('Cannot find activity log entry: %s: %s' % (event_type, description))
-
+        return found if len(found) else None
 
     def get_interval(self, start_text=None, end_text=None):
         if start_text:

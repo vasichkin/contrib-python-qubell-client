@@ -79,7 +79,7 @@ def waitForStatus(instance, final='Running', accepted=None, timeout=(20, 10, 1))
         We have to deal with lag when projection updates instance.
         :return:
         """
-        return instance.status != final and instance._is_projection_updated_instance()
+        return instance.status != final or instance._is_projection_updated_instance()
     projection_update_monitor()
 
     @retry(*timeout)  # ask status 20 times every 10 sec.
@@ -123,7 +123,6 @@ def waitForStatus(instance, final='Running', accepted=None, timeout=(20, 10, 1))
                   "%s"
                   "\n------------------ End of ActivityLog -----------------\n"
                   % instance.get_activitylog(severity=['ERROR', 'INFO']))
-        return False
     else:
         log.error("\n\n\nInstance didn't get '{0}' status, current status :'{1}'. \n\n"
                   "Instance: {2} ({3})\n"
@@ -136,6 +135,7 @@ def waitForStatus(instance, final='Running', accepted=None, timeout=(20, 10, 1))
             instance.organization.name, instance.organization.id,
             timeout[0]*timeout[1]*timeout[2]))
         log.debug(instance.get_activitylog(severity=['ERROR', 'INFO']))
+    return False
 
 
 def dump(node):

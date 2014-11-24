@@ -4,11 +4,14 @@ __author__ = 'dmakhno'
 
 # Global setting for zone
 ZONE_NAME = os.getenv('QUBELL_ZONE')
-zone_suffix = lambda: ' at '+ZONE_NAME if ZONE_NAME else ''
+zone_suffix = lambda: ' at '+os.getenv('QUBELL_ZONE') if os.getenv('QUBELL_ZONE') else ''
 
 DEFAULT_ENV_NAME = lambda: 'default'+zone_suffix()
 DEFAULT_WORKFLOW_SERVICE = lambda: 'Default workflow service'+zone_suffix()
 DEFAULT_CREDENTIAL_SERVICE = lambda: 'Default credentials service'+zone_suffix()
+DEFAULT_CLOUD_ACCOUNT_SERVICE = lambda: 'CloudAccountService'+zone_suffix()
+DEFAULT_SHARED_INSTANCE_CATALOG_SERVICE = lambda: 'BaseTestSharedService'+zone_suffix()
+
 
 QUBELL = {
     'user': os.getenv('QUBELL_USER'),
@@ -18,7 +21,7 @@ QUBELL = {
 }
 
 PROVIDER = {
-    'provider_name': os.getenv('PROVIDER_NAME', 'CloudAccountService'),
+    'provider_name': os.getenv('PROVIDER_NAME', DEFAULT_CLOUD_ACCOUNT_SERVICE()),
     'provider_type': os.getenv('PROVIDER_TYPE', 'aws-ec2'),
     'provider_identity': os.getenv('PROVIDER_IDENTITY', 'FAKE'),
     'provider_credential': os.getenv('PROVIDER_CREDENTIAL', 'FAKE'),

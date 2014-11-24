@@ -96,7 +96,7 @@ class Environment(Entity):
             if not serv in self.services:
                 self.add_service(serv)
         for service in self.services:
-            service.ready()
+            service.running()
 
     def json(self):
         return router.get_environment(org_id=self.organizationId, env_id=self.environmentId).json()

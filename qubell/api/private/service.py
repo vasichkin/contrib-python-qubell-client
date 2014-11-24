@@ -19,6 +19,7 @@ __license__ = "Apache"
 __email__ = "vkhomenko@qubell.com"
 
 import yaml
+import simplejson as json
 
 from qubell.api.private import exceptions
 from qubell.api.provider.router import ROUTER as router
@@ -52,19 +53,10 @@ class ServiceMixin(object):
     def regenerate(self):
         return router.post_service_generate(org_id=self.organizationId, instance_id=self.instanceId).json()
 
-
     def add_shared_instance(self, revision, instance):
-        params = self.parameters
-
-        try:
-            # Param could contain invalid yaml
-            old = yaml.safe_load(params[SHARED_INSTANCES_PARAMETER_NAME])
-        except:
-            old = params[SHARED_INSTANCES_PARAMETER_NAME]
-
-        old[revision.id] = instance.instanceId
-        params[SHARED_INSTANCES_PARAMETER_NAME] = yaml.safe_dump(old, default_flow_style=False)
-        self.reconfigure(parameters=params)
+        payload = json.dumps({"revisionNameId": revision.nameId,
+                              "instanceId": instance.instanceId})
+        router.post_instance_shared(org_id=self.organizationId, env_id=instance.environment.id, data=payload)
 
     def remove_shared_instance(self, instance):
         params = self.parameters

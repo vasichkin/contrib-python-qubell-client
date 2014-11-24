@@ -133,7 +133,7 @@ class Application(Entity):
     def list_revisions_json(self):
         return self.json()['revisions']
 
-    def create_revision(self, name, instance=None, parameters=[], version=None):
+    def create_revision(self, name, instance=None, parameters={}, version=None, submodules={}):
         if not version:
             version=self.get_manifest()['manifestVersion']
         if instance:
@@ -143,7 +143,7 @@ class Application(Entity):
                         'returnValues': [],
                         'applicationId': self.applicationId,
                         'applicationName': self.name,
-                        'version': version,
+                        'manifestVersion': version,
                         'instanceId': instance.instanceId})
             resp = router.post_revision(org_id=self.organizationId, app_id=self.applicationId, data=payload)
             return self.get_revision(id=resp.json()['id'])
@@ -151,9 +151,9 @@ class Application(Entity):
 
             payload = json.dumps({ 'name': name,
                             'parameters': parameters,
-                            'submodules': [],
+                            'submodules': submodules,
                             'applicationId': self.applicationId,
-                            'version': version,})
+                            'manifestVersion': version,})
             resp = router.post_revision_fs(org_id=self.organizationId, app_id=self.applicationId, data=payload)
             return self.get_revision(id=resp.json()['id'])
 

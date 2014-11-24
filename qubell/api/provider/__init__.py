@@ -84,6 +84,7 @@ def route(route_str):  # decorator param
                         raise api_http_code_errors[response.status_code](msg)
                     else:
                         log.debug(response.text)
+                        log.debug(response.request.body)
                         raise ApiError(msg)
             return response
 

@@ -15,6 +15,9 @@ def gen_response(code=200, resp_text="enjoy"):
         status_code = code
         text = resp_text
 
+        class request():
+            body = "request body"
+
     return DummyResponse
 
 

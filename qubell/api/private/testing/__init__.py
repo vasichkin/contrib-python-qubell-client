@@ -249,22 +249,6 @@ class BaseTestCase(unittest.TestCase):
         """
         log.info("\n\n\n---------------  Preparing sandbox...  ---------------")
         cls.sandbox = SandBox(cls.platform, cls.environment(organization))
-
-        # If 'meta' in sandbox, restore applications that comes in meta before.
-        applications = []
-        org = cls.platform.get_organization(name=cls.sandbox['organization']['name'])
-        if cls.__dict__.get('meta'):
-            meta_raw = requests.get(url=cls.__dict__.get('meta'))
-            log.info("Got meta: %s" % meta_raw)
-            meta = yaml.safe_load(meta_raw.content)
-            for app in meta['kit']['applications']:
-                applications.append({
-                    'name': app['name'],
-                    'url': app['manifest']})
-            log.info("Restoring: %s" % applications)
-            org.restore({'applications': applications})
-
-
         cls.organization = cls.sandbox.make()
         cls.regular_instances = []
         cls.service_instances = []
@@ -289,7 +273,7 @@ class BaseTestCase(unittest.TestCase):
 
         def check_instances(instances):
             for instance in instances:
-                if not instance.ready(timeout=timeout):
+                if not instance.running(timeout=timeout):
                     error = instance.error.strip()
 
                     # TODO: if instance fails to start during tests, add proper unittest log
@@ -299,6 +283,19 @@ class BaseTestCase(unittest.TestCase):
                         cls.clean()
                     assert not error, "Instance %s didn't launch properly and has error '%s'" % (instance.instanceId, error)
                     assert False, "Instance %s is not ready after %s minutes and stop on timeout" % (instance.instanceId, timeout)
+
+        # If 'meta' in sandbox, restore applications that comes in meta before.
+        # TODO: all this stuff needs refactoring.
+        applications = []
+        if cls.__dict__.get('meta'):
+            meta_raw = requests.get(url=cls.__dict__.get('meta'))
+            meta = yaml.safe_load(meta_raw.content)
+            #application = meta['kit']['name']
+            for app in meta['kit']['applications']:
+                applications.append({
+                    'name': app['name'],
+                    'url': app['manifest']})
+            cls.organization.restore({'applications':applications})
 
         # launch service instances first
         for app in cls.sandbox['applications']:
