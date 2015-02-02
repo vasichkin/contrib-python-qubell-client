@@ -53,6 +53,14 @@ class ServiceMixin(object):
     def regenerate(self):
         return router.post_service_generate(org_id=self.organizationId, instance_id=self.instanceId).json()
 
+    def list_keys(self):
+        return router.get_service_keys(org_id=self.organizationId, instance_id=self.instanceId).json()
+
+    def get_public_key(self, key_id=None):
+        if not key_id:
+            key_id = self.userData['defaultKey']
+        return router.get_service_public_key(org_id=self.organizationId, instance_id=self.instanceId, key_id=key_id).text
+
     def add_shared_instance(self, revision, instance):
         payload = json.dumps({"revisionNameId": revision.nameId,
                               "instanceId": instance.instanceId})

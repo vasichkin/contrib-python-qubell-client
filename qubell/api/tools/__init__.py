@@ -67,11 +67,13 @@ def retry(tries=10, delay=1, backoff=2, retry_exception=None):
         return f_retry
     return deco_retry
 
-def waitForStatus(instance, final='Running', accepted=None, timeout=(20, 10, 1)):
+def waitForStatus(instance, final='Active', accepted=None, timeout=(20, 10, 1)):
     started = time.time()
     info = '%s (%s)' % (instance.name, instance.id)
 
     if not accepted: accepted = ['Requested']
+
+    if not isinstance(final, list): final = [final]
 
     @retry(3, 1, 2)  # max = 1 + 2 + 4 = 7 seconds + routes time
     def projection_update_monitor():
@@ -79,7 +81,7 @@ def waitForStatus(instance, final='Running', accepted=None, timeout=(20, 10, 1))
         We have to deal with lag when projection updates instance.
         :return:
         """
-        return instance.status != final or instance._is_projection_updated_instance()
+        return instance.status not in final or instance._is_projection_updated_instance()
     projection_update_monitor()
 
     @retry(*timeout)  # ask status 20 times every 10 sec.
@@ -104,7 +106,7 @@ def waitForStatus(instance, final='Running', accepted=None, timeout=(20, 10, 1))
     if cur_status in final:
         return True
     elif cur_status in ['Error']:
-        log.error("\n\n\nInstance didn't get '{0}' status, current status :'{1}'. \n\n"
+        log.error("\n\n\nInstance didn't get one of {0} statuses, current status :'{1}'. \n\n"
                   "Instance: {2} ({3})\n"
                   "Application: {4} ({5})\n"
                   "Organization: {6} ({7})\n"
@@ -124,7 +126,7 @@ def waitForStatus(instance, final='Running', accepted=None, timeout=(20, 10, 1))
                   "\n------------------ End of ActivityLog -----------------\n"
                   % instance.get_activitylog(severity=['ERROR', 'INFO']))
     else:
-        log.error("\n\n\nInstance didn't get '{0}' status, current status :'{1}'. \n\n"
+        log.error("\n\n\nInstance didn't get one of {0} statuses, current status :'{1}'. \n\n"
                   "Instance: {2} ({3})\n"
                   "Application: {4} ({5})\n"
                   "Organization: {6} ({7})\n"

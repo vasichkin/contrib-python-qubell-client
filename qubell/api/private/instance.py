@@ -27,7 +27,7 @@ __email__ = "vkhomenko@qubell.com"
 import logging as log
 import simplejson as json
 import time
-from qubell.api.tools import lazyproperty
+from qubell.api.tools import lazyproperty, retry
 
 from qubell.api.tools import waitForStatus as waitForStatus
 from qubell.api.private import exceptions
@@ -170,6 +170,14 @@ class Instance(Entity, ServiceMixin):
 
         if not environment:
             environment = application.organization.defaultEnvironment
+
+        if not environment.isOnline:
+            # If environment offline for any reason, let it come up. Otherwise raise error
+            @retry(tries=10, delay=1, backoff=1.5, retry_exception=AssertionError)
+            def eventually_online():
+               assert environment.isOnline, "Environment {name} didn't get Online status".format(name=environment.name)
+            eventually_online()
+
         if not parameters: parameters = {}
         conf = {}
         conf['parameters'] = parameters
@@ -197,12 +205,12 @@ class Instance(Entity, ServiceMixin):
         return instance
 
     def ready(self, timeout=3):  # Shortcut for convinience. Timeout = 3 min (ask timeout*6 times every 10 sec)
-        return waitForStatus(instance=self, final='Running', accepted=['Launching', 'Requested', 'Executing', 'Unknown'], timeout=[timeout*20, 3, 1])
+        return waitForStatus(instance=self, final=['Active', 'Running'], accepted=['Launching', 'Requested', 'Executing', 'Unknown'], timeout=[timeout*20, 3, 1])
         # TODO: Unknown status  should be removed
 
     def running(self, timeout=3):
-        if self.status == 'Running':
-            log.debug("Instance {} is Running right now".format(self.id))
+        if self.status in ['Active', 'Running']:
+            log.debug("Instance {} is Active right now".format(self.id))
             return True
         mrut = self.most_recent_update_time
         if mrut:
@@ -210,14 +218,17 @@ class Instance(Entity, ServiceMixin):
         return self.ready(timeout)
 
     def destroyed(self, timeout=3):  # Shortcut for convinience. Temeout = 3 min (ask timeout*6 times every 10 sec)
-        return waitForStatus(instance=self, final='Destroyed', accepted=['Destroying', 'Running', 'Executing'], timeout=[timeout*20, 3, 1])
+        return waitForStatus(instance=self, final='Destroyed', accepted=['Destroying', 'Active', 'Running', 'Executing'], timeout=[timeout*20, 3, 1])
 
-    def run_workflow(self, name, parameters=None):
+    def run_workflow(self, name, component_path=None, parameters=None):
         if not parameters: parameters = {}
         log.info("Running workflow %s on instance %s (%s)" % (name, self.name, self.id))
         log.debug("Parameters: %s" % parameters)
         self._last_workflow_started_time = time.gmtime(time.time())
-        router.post_instance_workflow(org_id=self.organizationId, instance_id=self.instanceId, wf_name=name, data=json.dumps(parameters))
+        if component_path:
+            router.post_instance_component_workflow(org_id=self.organizationId, instance_id=self.instanceId, component_path=component_path, wf_name=name, data=json.dumps(parameters))
+        else:
+            router.post_instance_workflow(org_id=self.organizationId, instance_id=self.instanceId, wf_name=name, data=json.dumps(parameters))
         return True
 
     #alias
@@ -231,7 +242,10 @@ class Instance(Entity, ServiceMixin):
         router.post_instance_workflow_schedule(org_id=self.organizationId, instance_id=self.instanceId, wf_name=name, data=json.dumps(payload))
         return True
 
-    def reschedule_workflow(self, workflow_id, timestamp):
+    def reschedule_workflow(self, workflow_name=None, workflow_id=None, timestamp=None):
+        if workflow_name:
+            workflow_id = [x['id'] for x in self.scheduledWorkflows if x['name']==workflow_name][0]
+
         log.info("ReScheduling workflow %s on instance %s (%s), timestamp: %s" % (workflow_id, self.name, self.id, timestamp))
         payload = {'timestamp':timestamp}
         router.post_instance_reschedule(org_id=self.organizationId, instance_id=self.instanceId, workflow_id=workflow_id, data=json.dumps(payload))
@@ -386,7 +400,7 @@ class activityLog(object):
         Guess what item to return: time, index or description
         log[0] will return first entry
         log[1402654329064] will return description of event with tis time
-        log['Status is Running'] will return time of event, if found.
+        log['Status is Active'] will return time of event, if found.
         """
 
         if isinstance(item, int):
@@ -395,6 +409,8 @@ class activityLog(object):
             return '{0}: {1}'.format(self.log[item]['eventTypeText'], self.log[item]['description'])
         elif isinstance(item, str):
             return self.find(item)[0]
+        elif isinstance(item, slice):
+            return activityLog(self.log[item], severity=self.severity)
         return False
 
     def find(self, item, description='', event_type=''):

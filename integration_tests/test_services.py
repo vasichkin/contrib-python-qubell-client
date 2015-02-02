@@ -57,7 +57,7 @@ class ServiceClassTest(BaseTestCase):
         self.assertEqual(self.org.services[my_serv.name], serv)
         self.assertEqual(self.org.services[my_serv.id].name, serv.name)
         self.assertEqual(self.org.services[my_serv.name].id, serv.id)
-        self.assertEqual(self.org.services[my_serv.name].status, 'Running')
+        self.assertEqual(self.org.services[my_serv.name].status, 'Active')
 
         for x in self.org.services:
             self.assertTrue(x.name)

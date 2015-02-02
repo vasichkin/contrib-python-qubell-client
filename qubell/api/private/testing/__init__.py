@@ -23,19 +23,24 @@ import unittest
 import yaml
 import logging as log
 import re
+import sys
 
 from functools import wraps
 
 from qubell.api.globals import *
 from qubell.api.private.service import COBALT_SECURE_STORE_TYPE, WORKFLOW_SERVICE_TYPE, CLOUD_ACCOUNT_TYPE
+from qubell.api.private.exceptions import NotFoundError
 
 import logging
-import types
 
 import requests
+from nose.plugins.skip import SkipTest
 
 logging.getLogger("requests.packages.urllib3.connectionpool").setLevel(logging.ERROR)
 
+
+def norm(name):
+    return str(re.sub("[^a-zA-Z0-9_]+", "_", name))
 
 def format_as_api(data):
     """
@@ -45,7 +50,7 @@ def format_as_api(data):
     result = []
     if isinstance(data, dict):
         for name, value in data.items():
-            key = str(re.sub("[^a-zA-Z0-9_]", "", name))
+            key = norm(name)
             value.update({'name': name})
             result.append(value)
         return result
@@ -61,7 +66,6 @@ def values(names):
     def wrapper(func):
         @wraps(func)
         def wrapped_func(*args, **kwargs):
-            instance = None
             if len(args)>1:
                 instance=args[1]
             else:
@@ -109,70 +113,85 @@ def workflow(name, parameters=None, timeout=10):
             func(*args, **kwargs)
         return wrapped_func
     return wrapper
+def _parameterize(source_case, cases, tests):
+        '''This generates the classes (in the sense that it's a generator.)
+        '''
+        def clean_class(source):
+            import types
+            test_methods = [method.__name__ for _, method in source.__dict__.items()
+                                if isinstance(method, types.FunctionType) and method.func_name.startswith("test")]
+            setattr(source_case, '__name__', 'Source')
+            setattr(source_case, 'className', 'Source')
+            for test in test_methods:
+                delattr(source_case, test)
+
+        # Add tests to class if we got tests param
+        for test_name, test_method in tests.items():
+            setattr(source_case, test_name, test_method)
+
+        # Multiply classes per environment
+        if len(cases):
+            case_mod = sys.modules[source_case.__module__]
+            case_name = norm(source_case.__name__)
+            attrs = dict(source_case.__dict__)
+            clean_class(source_case)
+
+            for env in cases.keys():
+                env_name = norm(env)
+                updated_case = type('{0}_{1}'.format(case_name, env_name), (source_case,), attrs)
+                setattr(updated_case, 'className', env_name)
+                setattr(case_mod, updated_case.__name__, updated_case)
+                updated_case.current_environment = env_name
+                updated_case.source_name = case_name
+                yield updated_case
+        else:
+            yield source_case
 
 
-def environment(envdata):
-    """
-    Class decorator that allows to run tests in sandbox against different Qubell environments.
-    Each test method in suite is converted to <test_name>_on_environemnt_<environment_name>
-    :param params: dict
-    """
-    #assert isinstance(params, dict), "@environment decorator should take 'dict' with environments"
+def parameterize(source_case, cases={}, tests={}):
+    return list(_parameterize(source_case, cases, tests))
 
-    def copy(func, name=None):
-        return types.FunctionType(func.func_code, func.func_globals, name=name,
-                                  argdefs=func.func_defaults,
-                                  closure=func.func_closure)
-
+def environment(params):
     def wraps_class(clazz):
-        if "environments" in clazz.__dict__:
-            log.warn("Class {0} environment attribute is overridden".format(clazz.__name__))
-        params = format_as_api(envdata)
-        clazz.environments = params
+        # If QUBELL_ZONE set we should change env names to corresponding. So, new would be created in zone or cached by existing by name
+        zone = os.getenv('QUBELL_ZONE')
+        parameterize(source_case=clazz, cases=params)
+        if zone:
 
-        methods = [method
-                   for _, method in clazz.__dict__.items()
-                   if isinstance(method, types.FunctionType) and method.func_name.startswith("test")]
-        for env in params:
-            if env['name'] != DEFAULT_ENV_NAME():
-                env['name'] += '_for_%s' % clazz.__name__   # Each test class should have it's own set of envs.
-
-        for method in methods:
-            delattr(clazz, method.func_name)
-            log.info("Test '{0}' multiplied per environment in {1}".format(method.func_name, clazz.__name__))
-            for env in params:
-                new_name = method.func_name + "_on_environment_" + env['name']
-                setattr(clazz, new_name, copy(method, new_name))
+            for key, value in params.items():
+                name = '{0} at {1}'.format(key, zone)
+                params[name] = params.pop(key)
+        clazz.environments = format_as_api(params)
 
         return clazz
     return wraps_class
+environments = environment
 
+def applications(appsdata):
+    """
+    Class decorator that allows to crete applications and start instances there.
+    If used with environment decorator, instances would be started for every env.
+    :param appdata: list
+    """
+    def wraps_class(clazz):
+        if "applications" in clazz.__dict__:
+            log.warn("Class {0} applications attribute is overridden".format(clazz.__name__))
+        clazz.applications=clazz.applications+appsdata # This needed to pass to environment
+        return clazz
+    return wraps_class
+application = applications
 
 # noinspection PyPep8Naming
 def instance(byApplication):
     def wrapper(func):
-        def get_environment_name(self, f):
-            separator = "_on_environment_"
-            if len(f.__name__.split(separator)) > 1:
-                env = f.__name__.split(separator)[1]
-            elif "_testMethodName" in self.__dict__ and len(self._testMethodName.split(separator)) > 1:
-                env = self._testMethodName.split(separator)[1]
-            else:
-                env = DEFAULT_ENV_NAME()
-            return env
-
         @wraps(func)
         def wrapped_func(*args, **kwargs):
             self = args[0]
-            env = get_environment_name(self, func)
 
-            def find_by_application_name(app):
-                for inst in self.instances:
-                    if inst.application.name == app and inst.environment.name == env:
-                        return inst
-                return None
-
-            func(*args + (find_by_application_name(byApplication),), **kwargs)
+            ins = self.find_by_application_name(byApplication)
+            if not ins.running():
+                raise SkipTest("Instance %s not in Running state" % ins.name)
+            func(*args + (ins,), **kwargs)
         return wrapped_func
     return wrapper
 
@@ -182,6 +201,12 @@ class BaseTestCase(unittest.TestCase):
     parameters = None
     sandbox = None
     environments = None
+    applications = []
+    instances = []
+    current_environment = DEFAULT_ENV_NAME()
+
+    setup_error=None
+    setup_error_trace=None
 
     @classmethod
     def environment(cls, organization):
@@ -220,7 +245,8 @@ class BaseTestCase(unittest.TestCase):
             "organization": {"name": organization},
             "services": servs,
             "instances": insts,
-            "environments": envs}
+            "environments": envs,
+            "applications": cls.applications}
 
     @classmethod
     def timeout(cls):
@@ -230,113 +256,108 @@ class BaseTestCase(unittest.TestCase):
     def setUpClass(cls):
         super(BaseTestCase, cls).setUpClass()
 
-        if cls.parameters['organization']:
-            cls.prepare(cls.parameters['organization'], cls.timeout())
-        else:
-            cls.prepare(cls.__name__, cls.timeout())
+        log.info("\n\n\n---------------  Preparing sandbox...  ---------------")
+        try:
+            cls.service_instances = []
+            cls.regular_instances = []
+            org = cls.parameters.get('organization') or getattr(cls, 'source_name', False) or cls.__name__
+            cls.sandbox = SandBox(cls.platform, cls.environment(org))
+            cls.organization = cls.sandbox.make()
+
+            ### Start ###
+            # If 'meta' in sandbox, restore applications that comes in meta before.
+            if cls.__dict__.get('meta'):
+                cls.upload_metadata_applications(cls.__dict__.get('meta'))
+
+            services_to_start = [x for x in cls.sandbox['applications'] if x.get('add_as_service', False)]
+            instances_to_start = [x for x in cls.sandbox['applications'] if x.get('launch', True) and not x.get('add_as_service', False)]
+
+            for appdata in services_to_start:
+                ins = cls.launch_instance(appdata)
+                cls.service_instances.append(ins)
+                cls.organization.environments[cls.current_environment].add_service(ins)
+            cls.check_instances(cls.service_instances)
+
+            for appdata in instances_to_start:
+                cls.regular_instances.append(cls.launch_instance(appdata))
+            cls.check_instances(cls.regular_instances)
+
+        except BaseException as e:
+            cls.setup_error = e
+            import traceback
+            cls.setup_error_trace = traceback.format_exc()
+            log.error(cls.setup_error)
+            log.error(cls.setup_error_trace)
+        log.info("\n---------------  Sandbox prepared  ---------------\n\n")
 
     @classmethod
     def tearDownClass(cls):
-        if os.getenv("QUBELL_DEBUG", None) and not('false' in os.getenv("QUBELL_DEBUG", None)):
-            log.info("QUBELL_DEBUG is ON\n DO NOT clean sandbox")
-        else:
-            cls.clean()
-        super(BaseTestCase, cls).tearDownClass()
+        log.info("\n---------------  Cleaning sandbox  ---------------")
 
-    @classmethod
-    def prepare(cls, organization, timeout=30):
-        """ Create sandboxed test environment
-        """
-        log.info("\n\n\n---------------  Preparing sandbox...  ---------------")
-        cls.sandbox = SandBox(cls.platform, cls.environment(organization))
-        cls.organization = cls.sandbox.make()
+        cls.destroy_instances(cls.regular_instances)
+        cls.destroy_instances(cls.service_instances)
         cls.regular_instances = []
         cls.service_instances = []
 
+        log.info("\n---------------  Sandbox cleaned  ---------------\n")
+        super(BaseTestCase, cls).tearDownClass()
 
-        def launch_in_env(app, env):
-            environment = cls.organization.environments[env['name']]
-            application = cls.organization.applications[app['name']]
-            parameters = app.get('parameters', {})
-            settings = app.get('settings', {})
-            instance = cls.organization.create_instance(application=application,
-                                                        environment=environment,
-                                                        parameters=parameters,
-                                                        **settings)
-            if app.get('add_as_service', False):
-                environment.add_service(instance)
-            cls.sandbox.sandbox["instances"].append({
-                "id": instance.instanceId,
-                "name": instance.name,
-            })
-            return instance
-
-        def check_instances(instances):
-            for instance in instances:
-                if not instance.running(timeout=timeout):
-                    error = instance.error.strip()
-
-                    # TODO: if instance fails to start during tests, add proper unittest log
-                    if os.getenv("QUBELL_DEBUG", None) and not('false' in os.getenv("QUBELL_DEBUG", None)):
-                        pass
-                    else:
-                        cls.clean()
-                    assert not error, "Instance %s didn't launch properly and has error '%s'" % (instance.instanceId, error)
-                    assert False, "Instance %s is not ready after %s minutes and stop on timeout" % (instance.instanceId, timeout)
-
-        # If 'meta' in sandbox, restore applications that comes in meta before.
-        # TODO: all this stuff needs refactoring.
-        applications = []
-        if cls.__dict__.get('meta'):
-            meta_raw = requests.get(url=cls.__dict__.get('meta'))
-            meta = yaml.safe_load(meta_raw.content)
-            #application = meta['kit']['name']
-            for app in meta['kit']['applications']:
-                applications.append({
-                    'name': app['name'],
-                    'url': app['manifest']})
-            cls.organization.restore({'applications':applications})
-
-        # launch service instances first
-        for app in cls.sandbox['applications']:
-            for env in cls.sandbox['environments']:
-                if app.get('launch', True) and app.get('add_as_service', False):
-                    log.info("Sandbox: starting service in app: %s, env: %s" % (app['name'], env['name']))
-                    cls.service_instances.append(launch_in_env(app, env))
-        check_instances(cls.service_instances)
-
-        # then launch non-service instances
-        for app in cls.sandbox['applications']:
-            for env in cls.sandbox['environments']:
-                if app.get('launch', True) and not app.get('add_as_service', False):
-                    log.info("Sandbox: starting instance in app: %s, env: %s" % (app['name'], env['name']))
-                    cls.regular_instances.append(launch_in_env(app, env))
-        check_instances(cls.regular_instances)
-        
-        cls.instances = cls.service_instances + cls.regular_instances
-        log.info("\n---------------  Sandbox prepared  ---------------\n\n")
-
+    def setUp(self):
+        if self.setup_error:
+            raise self.setup_error
 
     @classmethod
-    def clean(cls, timeout=10):
-        log.info("\n---------------  Cleaning sandbox  ---------------")
-        def destroy_instances(instances):
+    def upload_metadata_applications(cls, metadata):
+        # Treat meta as file or link?
+        if 'http' in metadata:
+            meta = yaml.safe_load(requests.get(url=metadata).content)
+        else:
+            meta = yaml.safe_load(open(metadata, 'r').read())
+        applications = []
+        for app in meta['kit']['applications']:
+            applications.append({
+                'name': app['name'],
+                'url': app['manifest']})
+        return cls.organization.restore({'applications': applications})
+
+    @classmethod
+    def launch_instance(cls, appdata):
+        application = cls.organization.applications[appdata['name']]
+        environment = cls.organization.environments[cls.current_environment]
+        instance = cls.organization.create_instance(application=application,
+                                                    environment=environment,
+                                                    parameters=appdata.get('parameters', {}),
+                                                    **appdata.get('settings',{}))
+        return instance
+
+    @classmethod
+    def check_instances(cls, instances):
+        for instance in instances:
+            if not instance.running(timeout=cls.timeout()):
+                error = instance.error.strip()
+
+                # TODO: if instance fails to start during tests, add proper unittest log
+                if os.getenv("QUBELL_DEBUG", None) and not('false' in os.getenv("QUBELL_DEBUG", None)):
+                    pass
+
+                assert not error, "Instance %s didn't launch properly and has error '%s'" % (instance.instanceId, error)
+                assert False, "Instance %s is not ready after %s minutes and stop on timeout" % (instance.instanceId, cls.timeout())
+
+    @classmethod
+    def destroy_instances(cls, instances):
+        if os.getenv("QUBELL_DEBUG", None) and not('false' in os.getenv("QUBELL_DEBUG", None)):
+            log.info("QUBELL_DEBUG is ON\n DO NOT clean sandbox")
+        else:
             for instance in instances:
                 instance.destroy()
-                if not instance.destroyed(timeout):
-                    log.error(
-                        "Instance was not destroyed properly {0}: {1}", instance.id, instance.name)
+                if not instance.destroyed(cls.timeout()):
+                    log.error("Instance was not destroyed properly {0}: {1}", instance.id, instance.name)
 
-        destroy_instances(cls.regular_instances)
-        destroy_instances(cls.service_instances)
-        log.info("\n---------------  Sandbox cleaned  ---------------\n")
-
-    # noinspection PyPep8Naming
-    def findByApplicationName(self, name):
-        for instance in self.instances:
-            if instance.application.name == name:
-                return instance
-
+    def find_by_application_name(self, name):
+        for inst in self.regular_instances+self.service_instances:
+            if inst.application.name == name:
+                return inst
+        raise NotFoundError
 
 class SandBox(object):
     def __init__(self, platform, sandbox):

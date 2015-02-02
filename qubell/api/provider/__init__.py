@@ -7,7 +7,11 @@ import time
 import sys
 
 from qubell.api.private.exceptions import ApiError, api_http_code_errors
-
+try:
+    import requests.packages.urllib3 as urllib3
+    urllib3.disable_warnings()
+except:
+    pass
 
 log.getLogger("requests.packages.urllib3.connectionpool").setLevel(log.ERROR)
 

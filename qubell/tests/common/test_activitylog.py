@@ -28,7 +28,7 @@ class test_activityLog(unittest.TestCase):
                                                       "severity": "INFO", "eventTypeText": "command started"},
               {"time": 1407341599000, "self": "true", "description": "'action.default' (53e2541fe4b0cc5147c57557)",
                "severity": "INFO", "eventTypeText": "command finished"},
-              {"time": 1407341594969, "self": "true", "description": "Running", "severity": "INFO",
+              {"time": 1407341594969, "self": "true", "description": "Active", "severity": "INFO",
                "eventTypeText": "status updated"},
               {"time": 1407341594513, "self": "true", "description": "This is default manifest", "severity": "DEBUG",
                "source": "out.app_output", "eventTypeText": "signals updated"},
@@ -56,7 +56,7 @@ class test_activityLog(unittest.TestCase):
         for log in info_logs:
             assert log['severity'] == 'INFO'
 
-        assert 'status updated: Running' in info_logs
+        assert 'status updated: Active' in info_logs
         self.assertEqual(all_logs["command started: 'launch' \(.*\) by LAUNCHER Tester"], 1407341530000)
         self.assertEqual(all_logs[1407341530000], "command started: 'launch' (53e253dae4b0098a7cc0ac62) by LAUNCHER Tester")
         self.assertEqual(all_logs[0], "command started: 'launch' (53e253dae4b0098a7cc0ac62) by LAUNCHER Tester")
@@ -72,7 +72,7 @@ class test_activityLog(unittest.TestCase):
         logs = activityLog(self.actlog, severity='INFO', end=1407341594969)
         self.assertEqual(len(logs), 5)
         self.assertEqual(logs[0], "command started: 'launch' (53e253dae4b0098a7cc0ac62) by LAUNCHER Tester")
-        self.assertEqual(logs[-1], "status updated: Running")
+        self.assertEqual(logs[-1], "status updated: Active")
 
     def test_get_interval(self):
         logs = activityLog(self.actlog, severity='INFO').get_interval("command started: 'action.default' \(.*\) by LAUNCHER Tester", "workflow finished: wf with status 'Succeeded'")
@@ -85,3 +85,33 @@ class test_activityLog(unittest.TestCase):
 
         logs = activityLog(self.actlog, severity='INFO').get_interval(end_text="workflow finished: destroy with status 'Succeeded'")
         self.assertEqual(len(logs), 13)
+
+    def test_slice_take_first(self):
+        logs = activityLog(self.actlog)[:3]  # take 3 first entries only
+        self.assertEqual(len(logs), 3)
+        self.assertEqual(logs[0], "command started: 'launch' (53e253dae4b0098a7cc0ac62) by LAUNCHER Tester")
+        self.assertEqual(logs[1], "status updated: Executing")
+        self.assertEqual(logs[2], "workflow started: launch")
+
+    def test_slice_take_last(self):
+        logs = activityLog(self.actlog)[-3:]  # take 3 last entries only
+        self.assertEqual(len(logs), 3)
+        self.assertEqual(logs[0], "step finished: destroy")
+        self.assertEqual(logs[1], "workflow finished: destroy with status 'Succeeded'")
+        self.assertEqual(logs[2], "status updated: Destroyed")
+
+    def test_slice_drop_first(self):
+        logs = activityLog(self.actlog)[17:]  # drop 17 first entries
+        self.assertEqual(len(logs), 4)
+        self.assertEqual(logs[0], "step started: destroy")
+        self.assertEqual(logs[1], "step finished: destroy")
+        self.assertEqual(logs[2], "workflow finished: destroy with status 'Succeeded'")
+        self.assertEqual(logs[3], "status updated: Destroyed")
+
+    def test_slice_drop_last(self):
+        logs = activityLog(self.actlog)[:-17]  # drop 17 last entries
+        self.assertEqual(len(logs), 4)
+        self.assertEqual(logs[0], "command started: 'launch' (53e253dae4b0098a7cc0ac62) by LAUNCHER Tester")
+        self.assertEqual(logs[1], "status updated: Executing")
+        self.assertEqual(logs[2], "workflow started: launch")
+        self.assertEqual(logs[3], "dynamic links updated: in: This is default manifest\nout: This is default manifest")

@@ -115,12 +115,18 @@ class Environment(Entity):
     def list_services_json(self):
         return self.json()['services']
 
-    _put_environment = lambda self, data: router.put_environment(org_id=self.organizationId, env_id=self.environmentId, data=data)
+    def _put_environment(self, data):
+        # We could get 500 error here, if tests runs in parallel or strategy is not active
+        try:
+            return router.put_environment(org_id=self.organizationId, env_id=self.environmentId, data=data)
+        except exceptions.ApiError:
+            from random import randint
+            time.sleep(randint(1, 10))
+            return router.put_environment(org_id=self.organizationId, env_id=self.environmentId, data=data)
 
     def add_service(self, service):
         resp = None
         if service not in self.services:
-            time.sleep(3)  # TODO: Need to wait until strategy comes up
             data = self.json()
             data['serviceIds'].append(service.instanceId)
             data['services'].append(service.json())
@@ -149,7 +155,6 @@ class Environment(Entity):
         return resp.json()
 
     def add_marker(self, marker):
-        time.sleep(0.5) # TODO: Need to wait until strategy comes up
         data = self.json()
         data['markers'].append({'name': marker})
 
@@ -168,7 +173,6 @@ class Environment(Entity):
         return resp.json()
 
     def add_property(self, name, type, value):
-        time.sleep(0.5) # TODO: Need to wait until strategy comes up
         data = self.json()
         data['properties'].append({'name': name, 'type': type, 'value': value})
 
@@ -197,7 +201,6 @@ class Environment(Entity):
         return self._put_environment(data=json.dumps(data)).json()
 
     def add_policy(self, new):
-        time.sleep(0.5) # TODO: Need to wait until strategy comes up
         data = self.json()
         data['policies'].append(new)
 

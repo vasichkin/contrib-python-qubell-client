@@ -21,8 +21,7 @@ __email__ = "vkhomenko@qubell.com"
 
 import os
 
-from base import BaseTestCase
-from qubell.api.private.testing import environment, instance, BaseTestCase as TestingTestCase
+from qubell.api.testing import *
 
 def manifest(name):
     return os.path.realpath(os.path.join(os.path.dirname(__file__), name))
@@ -38,9 +37,7 @@ def manifest(name):
           'properties': [{'name': 'testprop', 'type':'string', 'value':'test-prop value'}]
          }
     })
-class SandboxClassTest(TestingTestCase):
-    parameters = BaseTestCase.parameters
-    platform = BaseTestCase.platform
+class SandboxClassTest(BaseComponentTestCase):
     name = 'SelfSandboxTest'
     apps = [{"name": name,
              "file": manifest('default.yml'),
@@ -49,21 +46,15 @@ class SandboxClassTest(TestingTestCase):
                  "in.app_input": "dddd"}
             }]
 
-    @classmethod
-    def environment(cls, organization):
-        base_env = super(SandboxClassTest, cls).environment(organization)
-        base_env['applications'] = cls.apps
-        return base_env
-
     @instance(byApplication=name)
     def test_instance(self, instance):
-        assert 'Running' == instance.status
+        assert 'Active' == instance.status
         app = self.organization.applications[self.name]
         assert instance in app.instances
 
     def test_env(self):
         default_env = self.organization.environments['default'].json()
-        custom_env = self.organization.environments['custom_for_SandboxClassTest'].json()
+        custom_env = self.organization.environments['custom'].json()
 
         assert 'reg/ami-777' in [ x['value'] for x in default_env['policies']]
         assert 'ubuntu7' in [ x['value'] for x in default_env['policies']]

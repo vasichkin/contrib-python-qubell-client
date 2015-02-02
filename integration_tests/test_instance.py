@@ -48,7 +48,7 @@ class InstanceClassTest(BaseTestCase):
         self.assertEqual(org.instances['Self-InstanceClassTest-Instance'], ins)
         self.assertEqual(org.instances['Self-InstanceClassTest-Instance'].name, ins.name)
         self.assertEqual(org.instances['Self-InstanceClassTest-Instance'].id, ins.id)
-        self.assertEqual(org.instances['Self-InstanceClassTest-Instance'].status, 'Running')
+        self.assertEqual(org.instances['Self-InstanceClassTest-Instance'].status, 'Active')
 
         for x in org.instances:
             self.assertTrue(x.name)
@@ -161,12 +161,12 @@ class InstanceClassTest(BaseTestCase):
         for log in info_logs:
             assert log['severity'] == 'INFO'
 
-        assert 'Running' in info_logs
+        assert 'Active' in info_logs
         self.assertRegexpMatches(all_logs[0], 'command started: launch \(.*\) by .*')
         @eventually(AssertionError, MismatchError)
         def assert_eventually():
             # Last line could be one og this.
-            self.assertTrue((all_logs[-1] == 'status updated: Running') or (all_logs[-1] == "command finished: launch") or all_logs[-1] == "signals updated: This is default manifest")
+            self.assertTrue((all_logs[-1] == 'status updated: Active') or (all_logs[-1] == "command finished: launch") or all_logs[-1] == "signals updated: This is default manifest")
         assert_eventually()
 
         self.assertRegexpMatches(info_logs[0], 'command started: launch \(.*\) by .*')
