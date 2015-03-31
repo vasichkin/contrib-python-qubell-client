@@ -15,6 +15,7 @@
 from collections import namedtuple
 import logging as log
 import time
+from qubell.api.provider.router import InstanceRouter
 
 from qubell.api.tools import is_bson_id
 from qubell.api.private import exceptions
@@ -29,11 +30,13 @@ __email__ = "vkhomenko@qubell.com"
 
 IdName = namedtuple('IdName', 'id,name')
 
+
 class Entity(object):
     def __eq__(self, other):
         return self.id == other.id
     def __ne__(self, other):
         return not self.__eq__(other)
+
 
 class EntityList(object):
     """ Class to store qubell objects information (Instances, Applications, etc)
@@ -46,7 +49,6 @@ class EntityList(object):
             self._id_name_list()
         except KeyError:
             raise exceptions.ApiNotFoundError("Object not found")
-
 
     def __iter__(self):
         self._id_name_list()
@@ -90,11 +92,13 @@ class EntityList(object):
     def _id_name_list(self):
         """Returns list of IdName tuple"""
         raise AssertionError("'_id_name_list' method should be implemented in subclasses")
+
     def _get_item(self, id_name):
         """Returns item, having only id"""
         raise AssertionError("'_get_item' method should be implemented in subclasses")
 
-class QubellEntityList(EntityList):
+
+class QubellEntityList(EntityList, InstanceRouter):
     """
     This is base class for entities that depends on organization
     """
@@ -108,11 +112,11 @@ class QubellEntityList(EntityList):
 
 
     def _id_name_list(self):
-        self._list=[]
+        self._list = []
         for ent in self.json():
-            if ent.get('id'): # Normal behavior
+            if ent.get('id'):  # Normal behavior
                 self._list.append(IdName(ent['id'], ent['name']))
-            elif ent.get('instanceId'): # public api in use
+            elif ent.get('instanceId'):  # public api in use
                 self._list.append(IdName(ent['instanceId'], ent['name']))
             else:
                 pass
@@ -126,6 +130,8 @@ class QubellEntityList(EntityList):
             entity = self.base_clz(organization=self.organization, id=id_name.id)
         except AttributeError:
             entity = self.base_clz(id=id_name.id)
+        if isinstance(entity, InstanceRouter):
+            entity.init_router(self._router)
         return entity
 
 

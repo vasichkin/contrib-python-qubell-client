@@ -1,5 +1,5 @@
 import unittest
-from qubell.api.private.instance import activityLog
+from qubell.api.private.instance import ActivityLog
 
 class test_activityLog(unittest.TestCase):
     actlog = [{"time": 1407341616257, "self": "true", "description": "Destroyed", "severity": "INFO",
@@ -47,8 +47,8 @@ class test_activityLog(unittest.TestCase):
                                                     "severity": "INFO", "eventTypeText": "command started"}]
 
     def test_sugar(self):
-        all_logs = activityLog(self.actlog)
-        info_logs = activityLog(self.actlog, severity='INFO')
+        all_logs = ActivityLog(self.actlog)
+        info_logs = ActivityLog(self.actlog, severity='INFO')
 
         self.assertEqual(len(all_logs), 21)
         self.assertEqual(len(info_logs), 14)
@@ -63,45 +63,45 @@ class test_activityLog(unittest.TestCase):
         self.assertEqual(all_logs[-1], 'status updated: Destroyed')
 
     def test_interval_start(self):
-        logs = activityLog(self.actlog, severity='INFO', start=1407341614922)
+        logs = ActivityLog(self.actlog, severity='INFO', start=1407341614922)
         self.assertEqual(len(logs), 4)
         self.assertEqual(logs[0], "workflow started: destroy")
         self.assertEqual(logs[-1], "status updated: Destroyed")
 
     def test_interval_end(self):
-        logs = activityLog(self.actlog, severity='INFO', end=1407341594969)
+        logs = ActivityLog(self.actlog, severity='INFO', end=1407341594969)
         self.assertEqual(len(logs), 5)
         self.assertEqual(logs[0], "command started: 'launch' (53e253dae4b0098a7cc0ac62) by LAUNCHER Tester")
         self.assertEqual(logs[-1], "status updated: Active")
 
     def test_get_interval(self):
-        logs = activityLog(self.actlog, severity='INFO').get_interval("command started: 'action.default' \(.*\) by LAUNCHER Tester", "workflow finished: wf with status 'Succeeded'")
+        logs = ActivityLog(self.actlog, severity='INFO').get_interval("command started: 'action.default' \(.*\) by LAUNCHER Tester", "workflow finished: wf with status 'Succeeded'")
         self.assertEqual(len(logs), 4)
         self.assertEqual(logs[0], "command started: 'action.default' (53e2541fe4b0cc5147c57557) by LAUNCHER Tester")
         self.assertEqual(logs[-1], "workflow finished: wf with status 'Succeeded'")
 
-        logs = activityLog(self.actlog, severity='INFO').get_interval("command started: 'launch' \(.*\) by .*")
+        logs = ActivityLog(self.actlog, severity='INFO').get_interval("command started: 'launch' \(.*\) by .*")
         self.assertEqual(len(logs), 14)
 
-        logs = activityLog(self.actlog, severity='INFO').get_interval(end_text="workflow finished: destroy with status 'Succeeded'")
+        logs = ActivityLog(self.actlog, severity='INFO').get_interval(end_text="workflow finished: destroy with status 'Succeeded'")
         self.assertEqual(len(logs), 13)
 
     def test_slice_take_first(self):
-        logs = activityLog(self.actlog)[:3]  # take 3 first entries only
+        logs = ActivityLog(self.actlog)[:3]  # take 3 first entries only
         self.assertEqual(len(logs), 3)
         self.assertEqual(logs[0], "command started: 'launch' (53e253dae4b0098a7cc0ac62) by LAUNCHER Tester")
         self.assertEqual(logs[1], "status updated: Executing")
         self.assertEqual(logs[2], "workflow started: launch")
 
     def test_slice_take_last(self):
-        logs = activityLog(self.actlog)[-3:]  # take 3 last entries only
+        logs = ActivityLog(self.actlog)[-3:]  # take 3 last entries only
         self.assertEqual(len(logs), 3)
         self.assertEqual(logs[0], "step finished: destroy")
         self.assertEqual(logs[1], "workflow finished: destroy with status 'Succeeded'")
         self.assertEqual(logs[2], "status updated: Destroyed")
 
     def test_slice_drop_first(self):
-        logs = activityLog(self.actlog)[17:]  # drop 17 first entries
+        logs = ActivityLog(self.actlog)[17:]  # drop 17 first entries
         self.assertEqual(len(logs), 4)
         self.assertEqual(logs[0], "step started: destroy")
         self.assertEqual(logs[1], "step finished: destroy")
@@ -109,7 +109,7 @@ class test_activityLog(unittest.TestCase):
         self.assertEqual(logs[3], "status updated: Destroyed")
 
     def test_slice_drop_last(self):
-        logs = activityLog(self.actlog)[:-17]  # drop 17 last entries
+        logs = ActivityLog(self.actlog)[:-17]  # drop 17 last entries
         self.assertEqual(len(logs), 4)
         self.assertEqual(logs[0], "command started: 'launch' (53e253dae4b0098a7cc0ac62) by LAUNCHER Tester")
         self.assertEqual(logs[1], "status updated: Executing")

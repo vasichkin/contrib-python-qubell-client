@@ -1,0 +1,11 @@
+markers: [markerer]
+properties:
+  ftp:
+    type: map<string,object>
+    value:
+      host: 10.210.220.35
+      user: anonymous
+      pass: anonymous
+  wcs-login:
+    type: string
+    value: fwadmin

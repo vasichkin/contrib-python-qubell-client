@@ -5,11 +5,12 @@ from requests.auth import HTTPBasicAuth
 
 from qubell.api.private.exceptions import ApiUnauthorizedError
 from qubell.api.provider import route, play_auth, basic_auth
+from qubell.api.globals import QUBELL as qubell_config
 
 
 class Router(object):
-    def __init__(self, base_url, verify_ssl=False, verify_codes=True):
-        self.base_url = base_url
+    def __init__(self, base_url=None, verify_ssl=False, verify_codes=True):
+        self.base_url = base_url or qubell_config['tenant']
         self.verify_ssl = verify_ssl
         self.verify_codes = verify_codes
 
@@ -17,12 +18,15 @@ class Router(object):
         self._auth = None
         self.public_api_in_use = False
 
+        self._creds = None
+
     @property
     def is_connected(self):
         return self._cookies and 'PLAY_SESSION' in self._cookies
 
-    #todo: add integration test for this
-    def connect(self, email, password):
+    def connect(self, email=None, password=None):
+        email = email or qubell_config['user']
+        password = password or qubell_config['password']
         url = self.base_url + '/signIn'
         data = {
             'email': email,
@@ -35,6 +39,20 @@ class Router(object):
             raise ApiUnauthorizedError("Authentication failed, please check settings")
 
         self._auth = HTTPBasicAuth(email, password)
+
+        self._creds = email, password
+
+
+class InstanceRouter(object):
+    """
+    Router dependency
+    """
+    _router = None
+    def init_router(self, router):
+        assert router, "router cannot be None"
+        self._router = router
+        return self
+
 
 class PrivatePath(Router):
 
@@ -118,7 +136,7 @@ class PrivatePath(Router):
     #Instance
     @play_auth
     @route("GET /organizations/{org_id}/dashboard{ctype}")
-    def get_instances(self, org_id, cookies, ctype=".json"): pass
+    def get_instances(self, org_id, cookies, params=None, ctype=".json"): pass
 
     @play_auth
     @route("GET /organizations/{org_id}/instances/{instance_id}{ctype}")
@@ -137,6 +155,10 @@ class PrivatePath(Router):
     def put_instance_configuration(self, org_id, instance_id, data, cookies, ctype=".json"): pass
 
     @play_auth
+    @route("PUT /organizations/{org_id}/instances/{instance_id}/rename{ctype}")
+    def put_instance_rename(self, org_id, instance_id, data, cookies, ctype=".json"): pass
+
+    @play_auth
     @route("POST /organizations/{org_id}/environments/updateServiceEnvs/{instance_id}{ctype}")
     def post_instance_services(self, org_id, instance_id, data, cookies, ctype=".json"): pass
 
@@ -146,11 +168,7 @@ class PrivatePath(Router):
 
     @play_auth
     @route("GET /organizations/{org_id}/instances/{instance_id}/activitylog{ctype}")
-    def get_instance_activitylog(self, org_id, instance_id, cookies, ctype=".json"): pass
-
-    @play_auth
-    @route("GET /organizations/{org_id}/instances/{instance_id}/activitylog{ctype}?after={timestamp}")
-    def get_instance_activitylog_after(self, org_id, instance_id, timestamp, cookies, ctype=".json"): pass
+    def get_instance_activitylog(self, org_id, instance_id, cookies, params=None, ctype=".json"): pass
 
     @play_auth
     @route("POST /organizations/{org_id}/instances/{instance_id}/{action}{ctype}")
@@ -188,6 +206,10 @@ class PrivatePath(Router):
     @play_auth
     @route("DELETE /organizations/{org_id}/environments/{env_id}{ctype}")
     def delete_environment(self, org_id, env_id, cookies, data="{}", ctype=".json"): pass
+
+    @play_auth
+    @route("POST /organizations/{org_id}/environments/{env_id}/import{ctype}")
+    def post_env_import(self, org_id, env_id, cookies, data="{}", files="{}", ctype=".json"): pass
 
     #Zone
     @play_auth
@@ -250,8 +272,28 @@ class PrivatePath(Router):
     def evict_user(self, org_id, cookies, user_id, data="{}", ctype=".json"): pass
 
     @play_auth
-    @route("POST /organizations/invite{ctype}")
+    @route("POST /invite{ctype}")
     def invite_user(self, cookies, data="{}", ctype=".json"): pass
+
+    @route("POST /quickSignUp")
+    def post_quick_sign_up(self, data=None, files=None): pass
+
+    @play_auth
+    @route("POST /organizations/{org_id}/init.json")
+    def post_init(self, org_id, data, cookies): pass
+
+    @play_auth
+    @route("GET /applications/upload{ctype}")
+    def get_upload(self, params, cookies, ctype=".json"): pass
+
+    @play_auth
+    @route("GET /organizations/{org_id}/categories{ctype}")
+    def get_categories(self, org_id, cookies, ctype=".json"): pass
+
+    @play_auth
+    @route("POST /organizations/{org_id}/application-kits.json")
+    def post_application_kits(self, org_id, data, cookies): pass
+
 
 class PublicPath(PrivatePath):
 # TODO: Public api hack.

@@ -21,24 +21,15 @@ __email__ = "vkhomenko@qubell.com"
 
 
 from base import BaseTestCase
-from qubell.api.private.instance import Instance
 
 
 class RolesClassTest(BaseTestCase):
 
-    @classmethod
-    def setUpClass(cls):
-        super(RolesClassTest, cls).setUpClass()
-        cls.org = cls.organization
-
-    @classmethod
-    def tearDownClass(cls):
-        super(RolesClassTest, cls).tearDownClass()
-
-
     def test_create_role_method(self):
         """ Check basic role creation/deletion works
         """
+        self.org = self.organization
+
         role = self.organization.create_role(name="role-creation-test", permissions="- CreateApplication:\n  - /*")
 
         self.assertTrue(role in self.org.roles)

@@ -1,5 +1,7 @@
 #!/bin/bash
 
+set -ev
+
 nosetests --version
 
 nosetests -v qubell/tests

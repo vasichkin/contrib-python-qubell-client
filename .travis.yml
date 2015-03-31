@@ -8,5 +8,9 @@ env:
     - secure: "GSIjKuNLmR5Ml5hW8puACRBMnblwdYxiVvpmbS4s9pmhMhzXFUY7OtIraO4vx8sVQ6LO0+ob3SAGva7zUhXMMBetzdej6TDMjVQdzhfvx1l/MPQ//cwTEHXViplK23uqeMvZ1z5e5Gklra4sY5fpaPKz0mCedL/owsae4JxoRPE="
     - secure: "H8IloaOJMK9T7WmIxEMxGFJx9DmIykITrRE0Q6388q9CDWhnvLYud6hy6bylBvLKm1Gx7ESoB10JmZpZer5LteqCVRV1mFXHX/ABORQuec8Mht8CoCHzk79HGES40riIbjP4jnFor6ntBsn7nLHH5kJTWChmnq2xFrH3t3++rXY="
     - secure: "JIgZlbWD1CkgoHvpSclMyiVaRBCOWnR0UtZgI1DuZWEp7fgphEDiWAYadEf+WVBfy6N6038f82xLMNqopx2sNdNsIYX9867WiWjWKd9j5tiiqIQ1Gb6lYv9t+33rbzxy/ZfR1/1RAYLU1J7AtB+vvvB/8d5v+sQMkSRarlVEsTg="
-install: pip install -r requirements.txt
-script: ./build.sh
+install:
+ - pip install -r requirements.txt
+ - pip install pylint
+script:
+ - ./build.sh
+ - pylint -d missing-docstring,line-too-long,invalid-name,multiple-statements qubell || true

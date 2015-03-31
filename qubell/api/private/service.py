@@ -22,9 +22,8 @@ import yaml
 import simplejson as json
 
 from qubell.api.private import exceptions
-from qubell.api.provider.router import ROUTER as router
 
-#ToDo: Move to Globals
+# ToDo: Move to Globals
 
 COBALT_SECURE_STORE_TYPE = 'builtin:cobalt_secure_store'
 WORKFLOW_SERVICE_TYPE = 'builtin:workflow_service'
@@ -43,32 +42,32 @@ system_application_parameters = {
     SHARED_INSTANCE_CATALOG_TYPE: 'configuration.shared-instances',
     STATIC_RESOURCE_POOL_TYPE: 'configuration.resources'}
 
-
-
 SHARED_INSTANCES_PARAMETER_NAME = system_application_parameters[SHARED_INSTANCE_CATALOG_TYPE]
 
 
 # noinspection PyUnresolvedReferences
 class ServiceMixin(object):
     def regenerate(self):
-        return router.post_service_generate(org_id=self.organizationId, instance_id=self.instanceId).json()
+        return self._router.post_service_generate(org_id=self.organizationId, instance_id=self.instanceId).json()
 
     def list_keys(self):
-        return router.get_service_keys(org_id=self.organizationId, instance_id=self.instanceId).json()
+        return self._router.get_service_keys(org_id=self.organizationId, instance_id=self.instanceId).json()
 
     def get_public_key(self, key_id=None):
         if not key_id:
             key_id = self.userData['defaultKey']
-        return router.get_service_public_key(org_id=self.organizationId, instance_id=self.instanceId, key_id=key_id).text
+        return self._router.get_service_public_key(org_id=self.organizationId,
+                                                   instance_id=self.instanceId, key_id=key_id).text
 
     def add_shared_instance(self, revision, instance):
         payload = json.dumps({"revisionNameId": revision.nameId,
                               "instanceId": instance.instanceId})
-        router.post_instance_shared(org_id=self.organizationId, env_id=instance.environment.id, data=payload)
+        self._router.post_instance_shared(org_id=self.organizationId, env_id=instance.environment.id, data=payload)
 
     def remove_shared_instance(self, instance):
         params = self.parameters
         if SHARED_INSTANCES_PARAMETER_NAME in params:
+            # noinspection PyBroadException
             try:
                 # Param could contain invalid yaml
                 old = yaml.safe_load(params[SHARED_INSTANCES_PARAMETER_NAME])

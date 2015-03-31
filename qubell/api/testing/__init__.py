@@ -16,12 +16,23 @@ except:
 # Define what users import by *
 __all__ = ['BaseComponentTestCase', 'applications', 'environment', 'environments', 'instance', 'values', 'workflow', 'eventually', 'attr']
 
-platform = QubellPlatform.connect(
-                tenant=qubell_config['tenant'],
-                user=qubell_config['user'],
-                password=qubell_config['password'])
-log.info('Authentication succeeded.')
+class Qubell(object):
+    """
+    This class holds platform object.
+    Platform is lazy.
+    """
+    __lazy_platform = None
 
+    # noinspection PyMethodParameters
+    @classmethod
+    def platform(cls):
+        """
+        lazy property, to authenticate when needed
+        """
+        if not cls.__lazy_platform:
+            cls.__lazy_platform = QubellPlatform.connect()
+            log.info('Authentication succeeded.')
+        return cls.__lazy_platform
 
 class BaseComponentTestCase(SandBoxTestCase):
     parameters = dict(qubell_config.items() + cloud_config.items())
@@ -35,7 +46,7 @@ class BaseComponentTestCase(SandBoxTestCase):
 
     @classmethod
     def setUpClass(cls):
-        cls.platform = platform
+        cls.platform = Qubell.platform()
         super(BaseComponentTestCase, cls).setUpClass()
 
 def eventually(*exceptions):

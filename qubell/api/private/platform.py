@@ -13,21 +13,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging as log
-import warnings
 import copy
 
-import simplejson as json
 from qubell.api.private import exceptions
 from qubell.api.private.organization import OrganizationList, Organization
 
-from qubell.api.provider.router import ROUTER as router
-from qubell import deprecated
-
-#todo: understood, that some people may use this object for authentication, need to move this to proper place
+from qubell.api.provider.router import InstanceRouter, PrivatePath, PublicPath
 
 from qubell.api.tools import lazyproperty
 
-### Backward compatibility for component testing ###
+# ## Backward compatibility for component testing ##
 from qubell.api.private.common import Auth
 Context = Auth
 ####################################################
@@ -37,54 +32,79 @@ __copyright__ = "Copyright 2013, Qubell.com"
 __license__ = "Apache"
 __email__ = "vkhomenko@qubell.com"
 
-class QubellPlatform(object):
+
+# noinspection PyShadowingBuiltins
+class QubellPlatform(InstanceRouter):
     def __init__(self, auth=None, context=None):
-        if context:
-            warnings.warn("replace context with auth name, it is deprecated and will be removed", DeprecationWarning,
-                          stacklevel=2)
-        self.auth = auth or context
+        assert not (auth or context), "support of auth and context parameters is removed"
 
     @staticmethod
-    def connect(tenant, user, password):
-
-        router.base_url = tenant
+    def connect(tenant=None, user=None, password=None, is_public=False):
+        """
+        Authenticates user and returns new platform to user.
+        This is an entry point to start working with Qubell Api.
+        :rtype: QubellPlatform
+        :param str tenant: url to tenant, default taken from 'QUBELL_TENANT'
+        :param str user: user email, default taken from 'QUBELL_USER'
+        :param str password: user password, default taken from 'QUBELL_PASSWORD'
+        :param bool is_public: either to use public or private api (public is not fully supported use with caution)
+        :return: New Platform instance
+        """
+        if not is_public:
+            router = PrivatePath(tenant)
+        else:
+            router = PublicPath(tenant)
+            router.public_api_in_use = is_public
         router.connect(user, password)
+        return QubellPlatform().init_router(router)
 
-        #todo: remove auth mimics when routes are used everywhere
-        router.tenant = tenant
-        router.user = user
-        router.password = password
-        return QubellPlatform(auth=router)
-
-    @deprecated('use QubellPlatform.connect instead')
-    def authenticate(self):
-        router.base_url = self.auth.tenant
-        router.connect(self.auth.user, self.auth.password)
-        #todo: remove following, left for compatibility
-        self.auth.cookies = router._cookies
-        return True
+    def connect_to_another_user(self, user, password, is_public=False):
+        """
+        Authenticates user with the same tenant as current platform using and returns new platform to user.
+        :rtype: QubellPlatform
+        :param str user: user email
+        :param str password: user password
+        :param bool is_public: either to use public or private api (public is not fully supported use with caution)
+        :return: New Platform instance
+        """
+        return QubellPlatform.connect(self._router.base_url, user, password, is_public)
 
     def list_organizations_json(self):
-        resp = router.get_organizations()
+        resp = self._router.get_organizations()
         return resp.json()
 
     @lazyproperty
     def organizations(self):
-        return OrganizationList(list_json_method=self.list_organizations_json)
+        """
+        Lists platform organizations, accessible to the user
+        :rtype: OrganizationList
+        """
+        return OrganizationList(list_json_method=self.list_organizations_json).init_router(self._router)
 
     def create_organization(self, name):
-        org = Organization.new(name)
-        assert org.ready()
+        """
+        Creates new organization
+        :rtype: Organization
+        """
+        org = Organization.new(name, self._router)
+        assert org.ready(), "Organization {} hasn't got ready after creation".format(name)
         return org
 
     def get_organization(self, id=None, name=None):
+        """
+        Gets existing and accessible organization
+        :rtype: Organization
+        """
         log.info("Picking organization: %s (%s)" % (name, id))
         return self.organizations[id or name]
 
-
     def get_or_create_organization(self, id=None, name=None):
-        """ Smart object. Will create organization, modify or pick one"""
-        if id: return self.get_organization(id)
+        """
+        Gets existing or creates new organization
+        :rtype: Organization
+        """
+        if id:
+            return self.get_organization(id)
         else:
             assert name
             try:
@@ -100,7 +120,6 @@ class QubellPlatform(object):
             restored_org = self.get_or_create_organization(id=org.get('id'), name=org.get('name'))
             restored_org.restore(org, clean, timeout)
 
-    @property
-    def info(self):
-        return self.auth
-
+    # noinspection PyMethodMayBeStatic
+    def authenticate(self):
+        assert False, 'use QubellPlatform.connect instead'

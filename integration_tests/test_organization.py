@@ -27,14 +27,6 @@ from qubell.api.private.manifest import Manifest
 
 class OrganizationClassTest(BaseTestCase):
 
-    @classmethod
-    def setUpClass(cls):
-        super(OrganizationClassTest, cls).setUpClass()
-
-    @classmethod
-    def tearDownClass(cls):
-        super(OrganizationClassTest, cls).tearDownClass()
-
 
     def test_organizations_sugar(self):
         platform = self.platform

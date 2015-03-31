@@ -103,7 +103,7 @@ def workflow(name, parameters=None, timeout=10):
             self = args[0]
             instance = args[1]
 
-            assert instance.run_workflow(name, parameters)
+            assert instance.run_workflow(name=name, parameters=parameters)
             if not instance.ready(timeout):
                 self.fail(
                     "Instance %s isn't ready in appropriate time: %s with parameters %s and timeout %s" % (
@@ -283,11 +283,13 @@ class BaseTestCase(unittest.TestCase):
             cls.check_instances(cls.regular_instances)
 
         except BaseException as e:
-            cls.setup_error = e
+            import sys
+            cls.setup_error = sys.exc_info()
+
             import traceback
             cls.setup_error_trace = traceback.format_exc()
-            log.error(cls.setup_error)
-            log.error(cls.setup_error_trace)
+            log.critical(e)
+            log.critical(cls.setup_error_trace)
         log.info("\n---------------  Sandbox prepared  ---------------\n\n")
 
     @classmethod
@@ -304,21 +306,11 @@ class BaseTestCase(unittest.TestCase):
 
     def setUp(self):
         if self.setup_error:
-            raise self.setup_error
+            raise self.setup_error[1], None, self.setup_error[2]
 
     @classmethod
     def upload_metadata_applications(cls, metadata):
-        # Treat meta as file or link?
-        if 'http' in metadata:
-            meta = yaml.safe_load(requests.get(url=metadata).content)
-        else:
-            meta = yaml.safe_load(open(metadata, 'r').read())
-        applications = []
-        for app in meta['kit']['applications']:
-            applications.append({
-                'name': app['name'],
-                'url': app['manifest']})
-        return cls.organization.restore({'applications': applications})
+        cls.organization.set_applications_from_meta(metadata)
 
     @classmethod
     def launch_instance(cls, appdata):

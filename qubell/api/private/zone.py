@@ -18,11 +18,13 @@ __copyright__ = "Copyright 2013, Qubell.com"
 __license__ = "Apache"
 __email__ = "vkhomenko@qubell.com"
 
-from qubell.api.private import exceptions
 from qubell.api.private.common import QubellEntityList, Entity
-from qubell.api.provider.router import ROUTER as router
+from qubell.api.provider.router import InstanceRouter
 
-class Zone(Entity):
+
+class Zone(Entity, InstanceRouter):
+
+    # noinspection PyShadowingBuiltins
     def __init__(self, organization, id):
         self.zoneId = self.id = id
         self.organizationId = organization.organizationId
@@ -33,12 +35,14 @@ class Zone(Entity):
         return self.json()['name']
 
     def json(self):
-        resp = router.get_zones(org_id=self.organizationId)
+        resp = self._router.get_zones(org_id=self.organizationId)
         zone = [x for x in resp.json() if x['id'] == self.zoneId]
-        if len(zone)>0:
+        if len(zone) > 0:
             return zone[0]
+
 
 class ZoneList(QubellEntityList):
     base_clz = Zone
+
     def __init__(self, organization):
         QubellEntityList.__init__(self, organization.list_zones_json, organization)

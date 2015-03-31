@@ -1,5 +1,5 @@
 import unittest
-from qubell.api.testing import environment
+from qubell.api.private.testing import environment
 __author__ = 'dmakhno'
 
 

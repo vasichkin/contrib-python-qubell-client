@@ -22,11 +22,12 @@ __email__ = "vkhomenko@qubell.com"
 import os
 
 from base import BaseTestCase
-from qubell.api.private.manifest import Manifest
+
 
 class EnvironmentClassTest(BaseTestCase):
     name = 'Self-EnvironmentClassTest'
 
+    # noinspection PyUnresolvedReferences
     @classmethod
     def setUpClass(cls):
         super(EnvironmentClassTest, cls).setUpClass()
@@ -34,12 +35,12 @@ class EnvironmentClassTest(BaseTestCase):
         cls.app = cls.org.create_application(manifest=cls.manifest, name=cls.name)
         cls.env = cls.org.create_environment(name=cls.name)
 
+    # noinspection PyUnresolvedReferences
     @classmethod
     def tearDownClass(cls):
         cls.env.delete()
         cls.app.delete()
         super(EnvironmentClassTest, cls).tearDownClass()
-
 
     def test_environments_sugar(self):
         org = self.org
@@ -67,7 +68,6 @@ class EnvironmentClassTest(BaseTestCase):
 
         self.assertTrue(self.org.delete_environment(my_env.id))
 
-
     def test_get_or_create_environment_method(self):
         org = self.org
         env = self.env
@@ -84,7 +84,6 @@ class EnvironmentClassTest(BaseTestCase):
 
     def test_smart_environment_method(self):
         org = self.org
-        env = self.env
         base_env = org.get_or_create_environment(name='Self-smart_environment_method')
 
         # Get environment
@@ -110,7 +109,7 @@ class EnvironmentClassTest(BaseTestCase):
 
     def test_service_crud(self):
         env = self.env
-        wf = self.org.get_service(name="Default workflow service")
+        wf = self.org.get_instance(name="Default workflow service")
         env.add_service(wf)
         env.add_service(wf)  # operation idempotent
         assert len(env.services) == 1
@@ -119,19 +118,104 @@ class EnvironmentClassTest(BaseTestCase):
         service.ready()
         assert service.id in env.services
         assert service.instanceId in env.services
-        self.org.get_or_create_service(service.name)
+        self.org.service(name=service.name)
         assert len(env.services) == 2
-        self.org.get_or_create_service(service.id)
-        self.org.get_or_create_service(service.instanceId)
+        self.org.service(service.id)
+        self.org.service(service.instanceId)
         assert len(env.services) == 2
         service.destroy()
         assert service.destroyed()
         assert len(env.services) == 1  # WF still there.
 
-    def test_policy_crud(self): pass
+    def test_marker_crud(self):
+        marker = "crud_test"
+        self.env.add_marker(marker)
+        assert self.marker_exists(self.env.json(), marker)
+        self.env.remove_marker(marker)
+        assert not self.marker_exists(self.env.json(), marker)
 
-    def test_marker_crud(self): pass
+    def test_property_crud(self):
+        property_name = "some-string"
+        self.env.add_property(property_name, "string", "abc")
+        assert self.property_exists(self.env.json(), property_name, "abc")
+        self.env.add_property(property_name, "string", "cdf")  # edit/override
+        assert self.property_exists(self.env.json(), property_name, "cdf")
+        self.env.remove_property(property_name)
+        assert not self.property_exists(self.env.json(), property_name)
 
-    def test_property_crud(self): pass
+    def test_policy_crud(self):
+        self.env.add_policy({"action": "customAction", "parameter": "customParameter", "value": "foo"})
+        assert self.policy_exists(self.env.json(), "customAction.customParameter", "foo")
+        self.env.add_policy(action="customAction", parameter="customParameter", value="bar")  # edit/override
+        assert self.policy_exists(self.env.json(), "customAction.customParameter", "bar")
+        self.env.remove_policy("customAction.customParameter")
+        assert not self.policy_exists(self.env.json(), "customAction.customParameter")
 
+    def test_env_import(self):
+        new_environment = self.org.create_environment(name='import-export')
+        new_environment.ready()
+        new_environment.import_yaml(file=os.path.join(os.path.dirname(__file__), './env_prop_pol_import.yml'))
+        assert 'wcs-login' in [x['name'] for x in new_environment.json()['properties']]
+        assert 'markerer' in [x['name'] for x in new_environment.json()['markers']]
+        new_environment.delete()
 
+    def test_env_bulk(self):
+        with self.env as env:
+            env.add_policy({"action": "bulkAction", "parameter": "bulkParameter", "value": "foo"})
+            env.add_marker("bulk_marker")
+            env.add_property("bulk-string", "string", "bulk")
+        env_json = self.env.json()
+        assert self.marker_exists(env_json, "bulk_marker")
+        assert self.property_exists(env_json, "bulk-string", "bulk")
+        assert self.policy_exists(env_json, "bulkAction.bulkParameter", "foo")
+
+        with self.env as env:
+            env.add_policy(action="bulkAction", parameter="bulkParameter", value="bar")
+            env.add_property("bulk-string", "string", "bulk_new")
+        env_json = self.env.json()
+        assert self.property_exists(env_json, "bulk-string", "bulk_new")
+        assert self.policy_exists(env_json, "bulkAction.bulkParameter", "bar")
+
+        with self.env as env:
+            env.remove_policy("bulkAction.bulkParameter")
+            env.remove_marker("bulk_marker")
+            env.remove_property("bulk-string")
+        env_json = self.env.json()
+        assert not self.marker_exists(env_json, "bulk_marker")
+        assert not self.property_exists(env_json, "bulk-string")
+        assert not self.policy_exists(env_json, "bulkAction.bulkParameter")
+
+    def test_remove_absent_marker(self):
+        self.env.remove_marker("transparent")
+
+    def test_remove_absent_policy(self):
+        self.env.remove_policy("none.none")
+
+    def test_remove_absent_property(self):
+        self.env.remove_property("ghost")
+
+    # helpers
+
+    def marker_exists(self, data, name):
+        return name in [m['name'] for m in data['markers']]
+
+    def property_exists(self, data, name, value=None):
+        prop = [p for p in data['properties'] if p['name'] == name]
+        if len(prop) == 0:
+            return False
+        elif not value:
+            return True
+        elif prop[0]['value'] == value:
+            return True
+        return False
+
+    def policy_exists(self, data, name, value=None):
+        policy_name = lambda p: "{}.{}".format(p.get('action'), p.get('parameter'))
+        pol = [p for p in data['policies'] if policy_name(p) == name]
+        if len(pol) == 0:
+            return False
+        elif not value:
+            return True
+        elif pol[0]['value'] == value:
+            return True
+        return False

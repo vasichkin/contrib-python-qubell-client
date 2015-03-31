@@ -29,10 +29,10 @@ import simplejson as json
 
 from qubell.api.private import exceptions
 from qubell.api.private.common import QubellEntityList, Entity
-from qubell.api.provider.router import ROUTER as router
+from qubell.api.provider.router import InstanceRouter
 
 
-class Application(Entity):
+class Application(Entity, InstanceRouter):
     """
     Base class for applications. It should create application and services+environment requested
     """
@@ -46,11 +46,11 @@ class Application(Entity):
 
     @lazyproperty
     def instances(self):
-        return InstanceList(list_json_method=self.list_instances_json, organization=self.organization)
+        return InstanceList(list_json_method=self.list_instances_json, organization=self.organization).init_router(self._router)
 
     @lazyproperty
     def revisions(self):
-        return RevisionList(list_json_method=self.list_revisions_json, application=self)
+        return RevisionList(list_json_method=self.list_revisions_json, application=self).init_router(self._router)
 
     @property
     def defaultEnvironment(self):
@@ -68,34 +68,34 @@ class Application(Entity):
         return ret
 
     @staticmethod
-    def new(organization, name, manifest):
+    def new(organization, name, manifest, router):
         log.info("Creating application: %s" % name)
 
         resp = router.post_organization_application(org_id=organization.organizationId,
                                                     files={'path': manifest.content},
                                                     data={'manifestSource': 'upload', 'name': name})
-        app = Application(organization, resp.json()['id'])
+        app = Application(organization, resp.json()['id']).init_router(router)
         app.manifest = manifest
         log.info("Application %s created (%s)" % (name, app.applicationId))
         return app
 
     def delete(self):
-        log.info("Removing application: %s (%s)" % (self.name, self.applicationId))
-        router.delete_application(org_id=self.organizationId, app_id=self.applicationId)
+        log.info("Removing application: id=%s" % (self.applicationId))
+        self._router.delete_application(org_id=self.organizationId, app_id=self.applicationId)
         return True
 
     def update(self, **kwargs):
         if kwargs.get('manifest'):
             self.upload(kwargs.pop('manifest'))
-        log.info("Updating application: %s (%s)" % (self.name, self.applicationId))
+        log.info("Updating application: id=%s" % (self.applicationId))
 
         data = json.dumps(kwargs)
-        resp = router.put_application(org_id=self.organizationId, app_id=self.applicationId, data=data)
+        resp = self._router.put_application(org_id=self.organizationId, app_id=self.applicationId, data=data)
         return resp.json()
 
     def clean(self, timeout=[7, 1, 1.5]):
         instances = self.instances
-        log.info("Cleaning application %s (%s)" % (self.name, self.applicationId))
+        log.info("Cleaning application: id=%s" % (self.applicationId))
         for ins in instances:
             if ins.status not in ['Destroyed', 'Destroying']:
                 ins.destroy()
@@ -111,11 +111,10 @@ class Application(Entity):
         return True
 
     def json(self):
-        return router.get_application(org_id=self.organizationId, app_id=self.applicationId).json()
+        return self._router.get_application(org_id=self.organizationId, app_id=self.applicationId).json()
 
     def list_instances_json(self):
-        instances = self.json()['instances']
-        return [ins for ins in instances if ins['status'] not in DEAD_STATUS]
+        return self.organization.list_instances_json(application=self)
 
     def __getattr__(self, key):
         resp = self.json()
@@ -127,7 +126,7 @@ class Application(Entity):
 # REVISION
     def get_revision(self, id):
         from qubell.api.private.revision import Revision
-        rev = Revision(application=self, id=id)
+        rev = Revision(application=self, id=id).init_router(self._router)
         return rev
 
     def list_revisions_json(self):
@@ -145,7 +144,7 @@ class Application(Entity):
                         'applicationName': self.name,
                         'manifestVersion': version,
                         'instanceId': instance.instanceId})
-            resp = router.post_revision(org_id=self.organizationId, app_id=self.applicationId, data=payload)
+            resp = self._router.post_revision(org_id=self.organizationId, app_id=self.applicationId, data=payload)
             return self.get_revision(id=resp.json()['id'])
         else:
 
@@ -154,7 +153,7 @@ class Application(Entity):
                             'submodules': submodules,
                             'applicationId': self.applicationId,
                             'manifestVersion': version,})
-            resp = router.post_revision_fs(org_id=self.organizationId, app_id=self.applicationId, data=payload)
+            resp = self._router.post_revision_fs(org_id=self.organizationId, app_id=self.applicationId, data=payload)
             return self.get_revision(id=resp.json()['id'])
 
     def delete_revision(self, id):
@@ -163,23 +162,23 @@ class Application(Entity):
 # MANIFEST
 
     def get_manifest(self):
-        return router.post_application_refresh(org_id=self.organizationId, app_id=self.applicationId).json()
+        return self._router.post_application_refresh(org_id=self.organizationId, app_id=self.applicationId).json()
 
     def upload(self, manifest):
-        log.info("Uploading manifest: %s to application: %s (%s)" % (manifest.source, self.name, self.applicationId))
+        log.info("Uploading manifest: %s to application: id=%s" % (manifest.source, self.applicationId))
         self.manifest = manifest
-        if router.public_api_in_use:
-            return router.post_application_manifest(org_id=self.organizationId, app_id=self.applicationId,
+        if self._router.public_api_in_use:
+            return self._router.post_application_manifest(org_id=self.organizationId, app_id=self.applicationId,
                                     data=manifest.content)
 
-        return router.post_application_manifest(org_id=self.organizationId, app_id=self.applicationId,
+        return self._router.post_application_manifest(org_id=self.organizationId, app_id=self.applicationId,
                                     files={'path': manifest.content},
                                     data={'manifestSource': 'upload', 'name': self.name}).json()
 
     def get_instance(self, id=None, name=None):
-        if id:  # submodule instances are invisible for lists
-            return Instance(id=id, organization=self.organization)
-        return self.instances[id or name]
+        if id:  # submodules instances are invisible for lists
+            return Instance(id=id, organization=self.organization).init_router(self._router)
+        return Instance.get(self._router, self.organization, name, application=self)
 
 
 class ApplicationList(QubellEntityList):

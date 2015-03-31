@@ -61,7 +61,7 @@ def route(route_str):  # decorator param
             destination_url = self.base_url + get_destination_url()
             f(*args, **kwargs)  # generally this is "pass"
 
-            bypass_args = {param: route_args[param] for param in ["data", "cookies", "auth", "files", "content_type"] if param in route_args}
+            bypass_args = {param: route_args[param] for param in ["data", "cookies", "auth", "files", "content_type", "params"] if param in route_args}
 
             #add json content type for:
             # - all public api, meaning have basic auth

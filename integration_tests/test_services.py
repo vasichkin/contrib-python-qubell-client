@@ -50,7 +50,7 @@ class ServiceClassTest(BaseTestCase):
         self.assertEqual('This is default manifest', serv.returnValues['out.app_output'])
         self.assertFalse(serv.destroyAt)
 
-        my_serv = self.org.get_service(id=serv.id)
+        my_serv = self.org.get_instance(id=serv.id)
         self.assertEqual(serv, my_serv)
 
         # Test Sugar
