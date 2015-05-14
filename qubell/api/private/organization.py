@@ -527,11 +527,16 @@ class Organization(Entity, InstanceRouter):
             "email": email,
             "roles": role_ids}))
 
-    def init(self):
+    def init(self, access_key=None, secret_key=None):
         """
         Mimics wizard's environment preparation
         """
-        self._router.post_init(org_id=self.organizationId, data='{"initCloudAccount": true}')
+        if not access_key and not secret_key:
+            self._router.post_init(org_id=self.organizationId, data='{"initCloudAccount": true}')
+        else:
+            self._router.post_init(org_id=self.organizationId, data='{}')
+            ca_data = dict(accessKey=access_key, secretKey=secret_key)
+            self._router.post_init_custom_cloud_account(org_id=self.organizationId, data=json.dumps(ca_data))
 
     def set_applications_from_meta(self, metadata):
         """
@@ -567,6 +572,12 @@ class Organization(Entity, InstanceRouter):
             category = self.categories['Application']
         data = {'categoryId': category.id, 'applications': manifests}
         self._router.post_application_kits(org_id=self.organizationId, data=json.dumps(data))
+
+    def wizard_components(self):
+        return self._router.get_welcome_wizard_components(org_id=self.organizationId).json()
+
+    def init_docker_service(self):
+        self._router.post_init_docker_service(org_id=self.organizationId)
 
     def list_category_json(self):
         return self._router.get_categories(org_id=self.organizationId).json()

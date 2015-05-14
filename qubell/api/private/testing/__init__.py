@@ -12,6 +12,7 @@
 # implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import os
 
 __author__ = "Anton Panasenko"
 __copyright__ = "Copyright 2013, Qubell.com"
@@ -210,12 +211,7 @@ class BaseTestCase(unittest.TestCase):
 
     @classmethod
     def environment(cls, organization):
-        provider_config = {'configuration.provider': cls.parameters['provider_type'],
-                           'configuration.legacy-regions': cls.parameters['provider_region'],
-                           'configuration.endpoint-url': '',
-                           'configuration.legacy-security-group': '',
-                           'configuration.identity': cls.parameters['provider_identity'],
-                           'configuration.credential': cls.parameters['provider_credential']}
+        provider_config = PROVIDER_CONFIG
 
         # Old style components tests declared name as 'test-provider'. Now we cannot add this provider to env where another provider set.
         if (cls.parameters['provider_name']=='test-provider') or (not(cls.parameters['provider_name'])):

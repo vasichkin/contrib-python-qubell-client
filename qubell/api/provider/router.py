@@ -130,6 +130,10 @@ class PrivatePath(Router):
     def get_revision(self, org_id, app_id, rev_id, cookies, ctype=".json"): pass
 
     @play_auth
+    @route("GET /organizations/{org_id}/applications/{app_id}/revisions{ctype}")
+    def get_revisions(self, org_id, app_id, cookies, ctype=".json"): pass
+
+    @play_auth
     @route("DELETE /organizations/{org_id}/applications/{app_id}/revisions/{rev_id}{ctype}")
     def delete_revision(self, org_id, app_id, rev_id, cookies, data="{}", ctype=".json"): pass
 
@@ -233,6 +237,10 @@ class PrivatePath(Router):
     @route("GET /organizations/{org_id}/services/{instance_id}/keys/{key_id}/id_rsa.pub")
     def get_service_public_key(self, org_id, instance_id, key_id, cookies, ctype=".json"): pass
 
+    @play_auth
+    @route("GET /organizations/{org_id}/environments/{env_id}/id_rsa")
+    def get_environment_default_private_key(self, org_id, env_id, cookies): pass
+
     # Role
     @play_auth
     @route("POST /organizations/{org_id}/roles{ctype}")
@@ -276,11 +284,23 @@ class PrivatePath(Router):
     def invite_user(self, cookies, data="{}", ctype=".json"): pass
 
     @route("POST /quickSignUp")
-    def post_quick_sign_up(self, data=None, files=None): pass
+    def post_quick_sign_up(self, data=None, params=None, files=None): pass
 
     @play_auth
     @route("POST /organizations/{org_id}/init.json")
     def post_init(self, org_id, data, cookies): pass
+
+    @play_auth
+    @route("POST /organizations/{org_id}/initCustomCloudAccount.json")
+    def post_init_custom_cloud_account(self, org_id, data, cookies): pass
+
+    @play_auth
+    @route("GET /organizations/{org_id}/welcomeWizardComponents.json")
+    def get_welcome_wizard_components(self, org_id, cookies): pass
+
+    @play_auth
+    @route("POST /organizations/{org_id}/initDockerService.json")
+    def post_init_docker_service(self, org_id, cookies, data="{}"): pass
 
     @play_auth
     @route("GET /applications/upload{ctype}")

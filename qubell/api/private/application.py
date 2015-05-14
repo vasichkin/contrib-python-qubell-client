@@ -130,7 +130,8 @@ class Application(Entity, InstanceRouter):
         return rev
 
     def list_revisions_json(self):
-        return self.json()['revisions']
+        # return self.json()['revisions']
+        return self._router.get_revisions(org_id=self.organizationId, app_id=self.applicationId).json()
 
     def create_revision(self, name, instance=None, parameters={}, version=None, submodules={}):
         if not version:

@@ -19,7 +19,10 @@ import copy
 import os
 import simplejson as json
 
-from qubell.api.globals import ZONE_NAME, DEFAULT_ENV_NAME
+from qubell.api.globals import *
+from qubell.api.globals import ZoneConstants
+from qubell.api.private.service import *
+from qubell.api.private.service import system_application_types
 from qubell.api.tools import lazyproperty, retry
 from qubell.api.private import exceptions, operations
 from qubell.api.private.common import QubellEntityList, Entity
@@ -106,6 +109,10 @@ class Environment(Entity, InstanceRouter):
     def delete(self):
         self._router.delete_environment(org_id=self.organizationId, env_id=self.environmentId)
         return True
+
+    def get_default_private_key(self):
+        return self._router.get_environment_default_private_key(org_id=self.organizationId,
+                                                                env_id=self.environmentId).text
 
     def set_as_default(self):
         data = json.dumps({'environmentId': self.id})
@@ -218,6 +225,7 @@ class Environment(Entity, InstanceRouter):
             data['policies'].remove(policy[0])
             log.info("Removing policy %s from environment %s (%s)" % (name, env_name, self.id))
 
+        # noinspection PyShadowingNames
         def set_component_policy(matchers=list(), actions=list()):
             if len([p for p in data['componentPolicies'] if p['matchers'] == matchers]):
                 data['componentPolicies'].remove([p for p in data['componentPolicies'] if p['matchers'] == matchers][0])
@@ -290,11 +298,42 @@ class Environment(Entity, InstanceRouter):
                        add_service=add_service, remove_service=remove_service,
                        set_component_policy=set_component_policy, remove_component_policy=remove_component_policy)
 
-
         for operation in env_operations:
             action, args, kwargs = operation
             actions[action](*args, **kwargs)
         return self._put_environment(data=json.dumps(data)).json()
+
+    def init_common_services(self, with_cloud_account=True, zone_name=None):
+        """
+        Initialize common service,
+        When 'zone_name' is defined " at $zone_name" is added to service names
+        :param bool with_cloud_account:
+        :param str zone_name:
+        :return: OR tuple(Workflow, Vault), OR tuple(Workflow, Vault, CloudAccount) with services
+        """
+        zone_names = ZoneConstants(zone_name)
+        type_to_app = lambda t: self.organization.applications[system_application_types.get(t, t)]
+        wf_service = self.organization.service(name=zone_names.DEFAULT_WORKFLOW_SERVICE,
+                                               application=type_to_app(WORKFLOW_SERVICE_TYPE),
+                                               environment=self)
+        key_service = self.organization.service(name=zone_names.DEFAULT_CREDENTIAL_SERVICE,
+                                                application=type_to_app(COBALT_SECURE_STORE_TYPE),
+                                                environment=self)
+        if not with_cloud_account:
+            with self as env:
+                env.add_service(wf_service)
+                env.add_service(key_service)
+            return wf_service, key_service
+
+        cloud_account_service = self.organization.service(name=zone_names.DEFAULT_CLOUD_ACCOUNT_SERVICE,
+                                                          application=type_to_app(CLOUD_ACCOUNT_TYPE),
+                                                          environment=self,
+                                                          parameters=PROVIDER_CONFIG)
+        with self as env:
+            env.add_service(wf_service)
+            env.add_service(key_service)
+            env.add_service(cloud_account_service)
+        return wf_service, key_service, cloud_account_service
 
     # noinspection PyMethodMayBeStatic
     def set_backend(self, zone):

@@ -257,6 +257,14 @@ class Instance(Entity, ServiceMixin, InstanceRouter):
                              accepted=accepted_states, timeout=[timeout*20, 3, 1])
         # TODO: Unknown status  should be removed
 
+    def launching(self, timeout=3):
+        accepted_states = ['Active', 'Running', 'Unknown', 'Executing']
+        return waitForStatus(instance=self, final='Launching', accepted=accepted_states, timeout=[timeout*20, 3, 1])
+
+    def failed(self, timeout=3):
+        accepted_states = ['Active', 'Running', 'Unknown', 'Executing']
+        return waitForStatus(instance=self, final='Error', accepted=accepted_states, timeout=[timeout*20, 3, 1])
+
     def running(self, timeout=3):
         if self.status in ['Active', 'Running']:
             log.debug("Instance {} is Active right now".format(self.id))
