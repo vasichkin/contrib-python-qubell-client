@@ -21,9 +21,11 @@ from qubell.api.private.organization import OrganizationList, Organization
 from qubell.api.provider.router import InstanceRouter, PrivatePath, PublicPath
 
 from qubell.api.tools import lazyproperty
+from qubell.api.private.exceptions import ApiAuthenticationError
 
 # ## Backward compatibility for component testing ##
 from qubell.api.private.common import Auth
+
 Context = Auth
 ####################################################
 
@@ -113,6 +115,22 @@ class QubellPlatform(InstanceRouter):
                 return self.create_organization(name)
 
     organization = get_or_create_organization
+
+    def get_backends_versions(self):
+        """
+        Get backends versions
+        :return: dict containing name of backend and version.
+        """
+        # We are not always have permission, so find open.
+        for i in range(0, len(self.organizations)):
+            try:
+                backends = self.organizations[i].environments['default'].backends
+            except ApiAuthenticationError:
+                pass
+            else:
+                break
+        versions = {x['name']: x['version'] for x in backends}
+        return versions
 
     def restore(self, config, clean=False, timeout=10):
         config = copy.deepcopy(config)

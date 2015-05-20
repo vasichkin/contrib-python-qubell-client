@@ -351,6 +351,13 @@ class Environment(Entity, InstanceRouter):
         self.__bulk.invalidate()
         self.__bulk_update(self.__bulk.operations)
 
+    def get_backend_version(self):
+        versions = {x['name']: x['version'] for x in self.json()['backends']}
+        if ZONE_NAME:
+            return versions[ZONE_NAME]
+        else:
+            return versions[self.organization.get_default_zone().name]
+
 
 class EnvironmentList(QubellEntityList):
     base_clz = Environment

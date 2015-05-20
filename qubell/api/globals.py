@@ -38,7 +38,7 @@ QUBELL = {
     'user': os.getenv('QUBELL_USER'),
     'password': os.getenv('QUBELL_PASSWORD'),
     'tenant': os.getenv('QUBELL_TENANT', 'http://localhost:9000'),
-    'organization': os.getenv('QUBELL_ORGANIZATION'),
+    'organization': os.getenv('QUBELL_ORGANIZATION', None),
 }
 
 PROVIDER = {

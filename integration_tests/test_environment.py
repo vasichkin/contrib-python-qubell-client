@@ -219,3 +219,6 @@ class EnvironmentClassTest(BaseTestCase):
         elif pol[0]['value'] == value:
             return True
         return False
+
+    def get_backend_version(self):
+        assert float(self.environment.get_backend_version()) > 30.0

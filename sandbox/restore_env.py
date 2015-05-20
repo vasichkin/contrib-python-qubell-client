@@ -16,8 +16,9 @@
 # limitations under the License.
 import os
 import sys
-import yaml
 from qubell.api.private.platform import QubellPlatform
+from qubell.api.tools import load_env
+from qubell.api.globals import QUBELL, PROVIDER_CONFIG
 import logging
 
 
@@ -47,60 +48,23 @@ if os.getenv('QUBELL_LOG_LEVEL', 'info') == 'debug':
 else:
     logging.getLogger().setLevel(logging.INFO)
 
-
 default_env = os.path.join(os.path.dirname(__file__), 'default.env')
 
-user = os.environ.get('QUBELL_USER', 'user')
-password = os.environ.get('QUBELL_PASSWORD', 'password')
-tenant = os.environ.get('QUBELL_TENANT', 'https://express.qubell.com')
-org = os.environ.get('QUBELL_ORGANIZATION', None)
-zone = os.environ.get('QUBELL_ZONE', '')
-
-provider = os.environ.get('PROVIDER_TYPE', 'aws-ec2')
-region = os.environ.get('PROVIDER_REGION', 'us-east-1')
-identity = os.environ.get('PROVIDER_IDENTITY')
-credentials = os.environ.get('PROVIDER_CREDENTIAL')
-
-
-__author__ = "Vasyl Khomenko"
-__copyright__ = "Copyright 2013, Qubell.com"
-__license__ = "Apache"
-__email__ = "vkhomenko@qubell.com"
-
-
-cloud_access = {
-      "provider": provider,
-      "usedEnvironments": [],
-      "ec2SecurityGroup": "default",
-      "providerCopy": provider,
-      "name": "generated-provider-for-tests",
-      "jcloudsIdentity": identity,
-      "jcloudsCredential": credentials,
-      "jcloudsRegions": region
-    }
-
-
-env = None
 if len(sys.argv)>1:
     env = sys.argv[1]
 else:
     env = default_env
 
-env_file = open(env)
-cfg = yaml.load(env_file)
+cfg = load_env(env)
 
-# Get cloud access info
-cfg['organizations'][0].update({'providers': [cloud_access]})
-if org:
-    cfg['organizations'][0].update({'name': org})
+# Patch configuration to include provider and org info
+cfg['organizations'][0].update({'providers': [PROVIDER_CONFIG]})
+if QUBELL['organization']:
+    cfg['organizations'][0].update({'name': QUBELL['organization']})
 
-platform = QubellPlatform()
-
-platform.connect(user=user, password=password, tenant=tenant)
+platform = QubellPlatform.connect(user=QUBELL['user'], password=QUBELL['password'], tenant=QUBELL['tenant'])
 print "Authorization passed"
 
-import pprint
-pprint.pprint(cfg)
 print "Restoring env: %s" % env
 platform.restore(cfg)
 print "Restore finished"

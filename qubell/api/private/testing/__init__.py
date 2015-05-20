@@ -206,8 +206,9 @@ class BaseTestCase(unittest.TestCase):
     instances = []
     current_environment = DEFAULT_ENV_NAME()
 
-    setup_error=None
-    setup_error_trace=None
+    setup_error = None
+    setup_error_trace = None
+    setup_skip = None
 
     @classmethod
     def environment(cls, organization):
@@ -257,26 +258,43 @@ class BaseTestCase(unittest.TestCase):
             cls.service_instances = []
             cls.regular_instances = []
             org = cls.parameters.get('organization') or getattr(cls, 'source_name', False) or cls.__name__
+
             cls.sandbox = SandBox(cls.platform, cls.environment(org))
             cls.organization = cls.sandbox.make()
 
+            if cls.__dict__.get('platform_version'):
+                ver = cls.organization.get_default_environment().get_backend_version()
+                try:
+                    current_version = float(ver)
+                except ValueError:
+                    # dev version: '41.0.148.g5ef3b00 2015-05-14 14:49:36'
+                    # universe version: 'v. v41.0.171.g8230c89'
+                    current_version = float(re.findall(r'\d+', ver)[0]+'.'+re.findall(r'\d+', ver)[1])
+                required_version = float(cls.platform_version)
+                if current_version < required_version:
+                    cls.setup_skip = 'Platform version %s required, got %s' % (required_version, current_version)
+
             ### Start ###
-            # If 'meta' in sandbox, restore applications that comes in meta before.
-            if cls.__dict__.get('meta'):
-                cls.upload_metadata_applications(cls.__dict__.get('meta'))
 
-            services_to_start = [x for x in cls.sandbox['applications'] if x.get('add_as_service', False)]
-            instances_to_start = [x for x in cls.sandbox['applications'] if x.get('launch', True) and not x.get('add_as_service', False)]
+            if cls.setup_error or cls.setup_skip:
+                pass # go to exit
+            else:
+                # If 'meta' in sandbox, restore applications that comes in meta before.
+                if cls.__dict__.get('meta'):
+                    cls.upload_metadata_applications(cls.__dict__.get('meta'))
 
-            for appdata in services_to_start:
-                ins = cls.launch_instance(appdata)
-                cls.service_instances.append(ins)
-                cls.organization.environments[cls.current_environment].add_service(ins)
-            cls.check_instances(cls.service_instances)
+                services_to_start = [x for x in cls.sandbox['applications'] if x.get('add_as_service', False)]
+                instances_to_start = [x for x in cls.sandbox['applications'] if x.get('launch', True) and not x.get('add_as_service', False)]
 
-            for appdata in instances_to_start:
-                cls.regular_instances.append(cls.launch_instance(appdata))
-            cls.check_instances(cls.regular_instances)
+                for appdata in services_to_start:
+                    ins = cls.launch_instance(appdata)
+                    cls.service_instances.append(ins)
+                    cls.organization.environments[cls.current_environment].add_service(ins)
+                cls.check_instances(cls.service_instances)
+
+                for appdata in instances_to_start:
+                    cls.regular_instances.append(cls.launch_instance(appdata))
+                cls.check_instances(cls.regular_instances)
 
         except BaseException as e:
             import sys
@@ -303,6 +321,8 @@ class BaseTestCase(unittest.TestCase):
     def setUp(self):
         if self.setup_error:
             raise self.setup_error[1], None, self.setup_error[2]
+        elif self.setup_skip:
+            raise self.skipTest(self.setup_skip)
 
     @classmethod
     def upload_metadata_applications(cls, metadata):

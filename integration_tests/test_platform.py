@@ -37,3 +37,8 @@ class PlatformClassTest(BaseTestCase):
         ids = set([o.id for o in self.platform.organizations])
         minion_ids = set([o.id for o in minion_platform.organizations])
         assert ids != minion_ids
+
+    def test_get_backends(self):
+        backends = self.platform.get_backends_versions()
+        assert 'Qubell/us-east' in backends.keys()
+        assert float(backends['Qubell/us-east']) > 30
