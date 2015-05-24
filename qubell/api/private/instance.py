@@ -58,27 +58,16 @@ class Instance(Entity, ServiceMixin, InstanceRouter):
 
     @lazyproperty
     def environments(self):
-        #TODO: FIXME: get rid of old API when its support will be removed
-        old_api_value = lambda: self.json().get('environments', [])
-        new_api_value = lambda: self.json().get('serviceIn', [])
-        list_environments_json = lambda: new_api_value() or old_api_value()
+        list_environments_json = lambda: self.json()['environments']
         return EnvironmentList(list_json_method=list_environments_json, organization=self).init_router(self._router)
 
     @lazyproperty
     def applicationId(self):
-        j = self.json()
-        #TODO: FIXME: get rid of old API when its support will be removed
-        old_api_value = j.get('applicationId')
-        new_api_value = j.get('application', {}).get('id')
-        return new_api_value or old_api_value
+        return self.json()['applicationId']
 
     @lazyproperty
     def environmentId(self):
-        j = self.json()
-        #TODO: FIXME: get rid of old API when its support will be removed
-        old_api_value = j.get('environmentId')
-        new_api_value = j.get('environment', {}).get('id')
-        return new_api_value or old_api_value
+        return self.json()['environmentId']
 
     @lazyproperty
     def submodules(self):
@@ -87,11 +76,6 @@ class Instance(Entity, ServiceMixin, InstanceRouter):
         if self._router.public_api_in_use:
             return InstanceList(list_json_method=lambda: self.json()['components'], organization=self.organization).init_router(self._router)
         return InstanceList(list_json_method=lambda: self.json()['submodules'], organization=self.organization).init_router(self._router)
-
-    @lazyproperty
-    def destroyAt(self):
-        j = self.json()
-        return j.get('destroyAt', False)
 
     @property
     def status(self):
@@ -114,21 +98,15 @@ class Instance(Entity, ServiceMixin, InstanceRouter):
         """ Guess what api we are using and return as public api does.
         Private has {'id':'key', 'value':'keyvalue'} format, public has {'key':'keyvalue'}
         """
-
-        j = self.json()
-        #TODO: FIXME: get rid of old API when its support will be removed
-        old_api_value = j.get('returnValues')
-        new_api_value = j.get('endpoints')
-
-        retvals = new_api_value or old_api_value
         # TODO: Public api hack.
+        retvals = self.json()['returnValues']
         if self._router.public_api_in_use:
             return retvals
         return self.__parse(retvals)
 
     @property
     def error(self):
-        return self.json().get('errorMessage', False)
+        return self.json()['errorMessage']
 
     @property
     def activitylog(self):
@@ -158,19 +136,10 @@ class Instance(Entity, ServiceMixin, InstanceRouter):
     @property
     def parameters(self):
         # todo: Public api hack.
-        j = self.json()
         if self._router.public_api_in_use:  # We do not have 'revision' in public api
-            return j['parameters']
+            return self.json()['parameters']
 
-        #TODO: FIXME: get rid of old API when its support will be removed
-        old_api_value = j.get('revision', {}).get('parameters')
-        new_api_value = j.get('config')
-        # if not (j.get('revision') is None or j['revision'].get('parameters') is None):
-        #     parameters = j['revision']['parameters']
-        # else:
-        #     parameters = j['config']
-
-        parameters = new_api_value or old_api_value
+        parameters = self.json()['revision']['parameters']
         if type(parameters) == list:  # v39+ - list of dicts: id, title, value
             return self.__parse(parameters)
         else:  # <v39 - dict  todo: remove when 39+ is wide in production
@@ -182,15 +151,6 @@ class Instance(Entity, ServiceMixin, InstanceRouter):
         if key == 'ready':
             log.debug('Checking instance status')
             return self.ready()
-        #TODO: FIXME: old API support: remove when its support will be removed on server
-        elif key in ['currentWorkflow', 'workflowHistory', 'scheduledWorkflows', 'availableWorkflows']:
-            log.debug('Getting instance workflow attribute: %s' % key)
-            j = self.json()
-            old_api_value = j.get(key)
-            new_api_value = j.get('workflowsInfo', {}).get(key, False)
-            atr = new_api_value or old_api_value
-            log.debug(atr)
-            return atr
         else:
             log.debug('Getting instance attribute: %s' % key)
             atr = self.json()[key]
@@ -402,12 +362,12 @@ class Instance(Entity, ServiceMixin, InstanceRouter):
         return True
 
     def destroy(self):
-        log.info("Destroying instance id=%s" % self.id)
+        log.info("Destroying instance id=%s" % (self.id))
         return self.run_workflow("destroy")
 
     @property
     def serve_environments(self):
-        return EnvironmentList(lambda: self.environments, organization=self.organization)
+        return EnvironmentList(lambda: self.json()["environments"], organization=self.organization)
 
     def add_as_service(self, environments=None, environment_ids=None):
         merged_ids = set()
@@ -443,13 +403,14 @@ class Instance(Entity, ServiceMixin, InstanceRouter):
         - else max of workflowHistory startedAt is most recent update.
         """
         parse_time = lambda t: time.gmtime(t/1000)
+        j = self.json()
         try:
-            if self.currentWorkflow:
-                cw_started_at = self.currentWorkflow['startedAt']
+            if j['currentWorkflow']:
+                cw_started_at = j['currentWorkflow']['startedAt']
                 if cw_started_at:
                     return parse_time(cw_started_at)
 
-            max_wf_started_at = max([i['startedAt'] for i in self.workflowHistory])
+            max_wf_started_at = max([i['startedAt'] for i in j['workflowHistory']])
             return parse_time(max_wf_started_at)
         except ValueError:
             return None
