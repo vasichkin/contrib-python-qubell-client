@@ -69,6 +69,7 @@ class Organization(Entity, InstanceRouter):
         return ApplicationList(list_json_method=self.list_applications_json, organization=self).init_router(self._router)
 
     @lazyproperty
+
     def services(self):
         return InstanceList(list_json_method=self.list_services_json, organization=self).init_router(self._router)
 

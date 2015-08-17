@@ -17,10 +17,10 @@ import logging as log
 import time
 from qubell.api.provider.router import InstanceRouter
 
-from qubell.api.tools import is_bson_id
+from qubell.api.tools import is_bson_id, retry
 from qubell.api.private import exceptions
 from qubell import deprecated
-
+import pprint
 
 __author__ = "Vasyl Khomenko"
 __copyright__ = "Copyright 2013, Qubell.com"
@@ -144,3 +144,78 @@ class Auth(object):
 
         # TODO: parse tenant to generate api url
         self.api = tenant
+
+
+class Response(dict):
+    """
+    Base class for response object. This class provides retry capabilities for Router queries.
+    Class mimics dict() in usage.
+    If got KeyError, retry query until got key or timeout.
+
+    Note, nested dicts (dict(dict(...)) are not processed separately, as KeyError thrown for internal dict, forcing us to retry.
+    """
+    tries_count = 0
+    data = None
+
+    def __init__(self, data_fn, retry_query=True):
+        self.data_fn = data_fn
+        self.retry = retry_query
+
+
+    def get_data_retry(self, key, tries=10, delay=1, backoff=1.1, retry_exception=(KeyError, exceptions.NotFoundError)):
+        """
+        Retry "tries" times, with initial "delay", increasing delay "delay*backoff" each time.
+        Without exception success means when function returns valid object.
+        With exception success when no exceptions
+        """
+        mtries, mdelay = tries, delay
+        log.debug("Response: Start retry (%s, %s, %s) for key: %s" % (tries, delay, backoff, key))
+        while mtries > 0:
+            mdelay *= backoff
+            try:
+                return self.get_key(key)
+            except retry_exception:
+                pass
+
+            mtries -= 1
+            if mtries <= 0:
+                return self.get_key(key) # extra try, to avoid except-raise syntax
+            log.debug("{0} try, sleeping for {1} sec".format(tries-mtries, mdelay))
+            self.tries_count = tries-mtries
+            time.sleep(mdelay)
+        raise Exception("unreachable code")
+
+    def get_key(self, key):
+        log.debug("Response: Getting key: %s" % key)
+        self.data = self.data_fn()
+        return self.data[key]
+
+    def get_data(self):
+        self.data = self.data_fn()
+        return self.data
+
+    def __iter__(self):
+        for x in self.data:
+            yield x
+
+    def __repr__(self):
+        return pprint.pformat(self.get_data())
+
+    def __str__(self):
+        return pprint.pformat(self.get_data())
+
+    def __getitem__(self, key):
+        if self.retry:
+            return self.get_data_retry(key)
+        else:
+            return self.get_key(key)
+
+    def get(self, key, default=None):
+        try:
+            return self[key]
+        except KeyError:
+            return default
+
+    def __call__(self, *args, **kwargs):
+        return self.get_data()
+

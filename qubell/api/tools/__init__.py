@@ -48,7 +48,6 @@ def retry(tries=10, delay=1, backoff=2, retry_exception=None):
             mtries, mdelay = tries, delay
 
             while mtries > 0:
-                time.sleep(mdelay)
                 mdelay *= backoff
                 try:
                     rv = f(*args, **kwargs)
@@ -65,6 +64,7 @@ def retry(tries=10, delay=1, backoff=2, retry_exception=None):
                 if mtries is 0 and catching_mode:
                     return f(*args, **kwargs)  # extra try, to avoid except-raise syntax
                 log.debug("{0} try, sleeping for {1} sec".format(tries-mtries, mdelay))
+                time.sleep(mdelay)
             raise Exception("unreachable code")
         return f_retry
     return deco_retry

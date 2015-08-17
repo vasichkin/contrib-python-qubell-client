@@ -105,7 +105,7 @@ class ServiceMixin(object):
 
     @property
     def is_secure_vault(self):
-        raw = self.json()
-        if 'templateId' in raw:
-            return raw['templateId'] == COBALT_SECURE_STORE_TYPE
+        raw = self.json(retry_query=False)
+        if raw.get('templateId') == COBALT_SECURE_STORE_TYPE:
+            return True
         return False

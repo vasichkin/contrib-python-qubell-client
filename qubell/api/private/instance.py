@@ -23,7 +23,7 @@ from qubell.api.private.service import ServiceMixin
 from qubell.api.tools import lazyproperty, retry
 from qubell.api.tools import waitForStatus as waitForStatus
 from qubell.api.private import exceptions
-from qubell.api.private.common import QubellEntityList, Entity
+from qubell.api.private.common import QubellEntityList, Entity, Response
 from qubell.api.provider.router import InstanceRouter
 
 __author__ = "Vasyl Khomenko"
@@ -49,24 +49,16 @@ class Instance(Entity, ServiceMixin, InstanceRouter):
         self._last_workflow_started_time = None
 
     @lazyproperty
-    def application(self):
-        return self.organization.applications[self.applicationId]
-
-    @lazyproperty
-    def environment(self):
-        return self.organization.environments[self.environmentId]
-
-    @lazyproperty
     def environments(self):
         #TODO: FIXME: get rid of old API when its support will be removed
-        old_api_value = lambda: self.json().get('environments', [])
-        new_api_value = lambda: self.json().get('serviceIn', [])
+        old_api_value = lambda: self.json(retry_query=False).get('environments', [])
+        new_api_value = lambda: self.json(retry_query=False).get('serviceIn', [])
         list_environments_json = lambda: new_api_value() or old_api_value()
         return EnvironmentList(list_json_method=list_environments_json, organization=self).init_router(self._router)
 
     @lazyproperty
     def applicationId(self):
-        j = self.json()
+        j = self.json(retry_query=False)
         #TODO: FIXME: get rid of old API when its support will be removed
         old_api_value = j.get('applicationId')
         new_api_value = j.get('application', {}).get('id')
@@ -74,11 +66,19 @@ class Instance(Entity, ServiceMixin, InstanceRouter):
 
     @lazyproperty
     def environmentId(self):
-        j = self.json()
+        j = self.json(retry_query=False)
         #TODO: FIXME: get rid of old API when its support will be removed
         old_api_value = j.get('environmentId')
         new_api_value = j.get('environment', {}).get('id')
         return new_api_value or old_api_value
+
+    @lazyproperty
+    def application(self):
+        return self.organization.applications[self.applicationId]
+
+    @lazyproperty
+    def environment(self):
+        return self.organization.environments[self.environmentId]
 
     @lazyproperty
     def submodules(self):
@@ -90,16 +90,15 @@ class Instance(Entity, ServiceMixin, InstanceRouter):
 
     @property
     def destroyAt(self):
-        j = self.json()
-        return j.get('destroyAt', False)
+        return self.json(retry_query=False).get('destroyAt', False)
 
     @property
     def status(self):
-        return self.json()['status']
+        return self.json(retry_query=False)['status']
 
     @property
     def name(self):
-        return self.json()['name']
+        return self.json(retry_query=False)['name']
 
     @property
     def userData(self):
@@ -162,7 +161,7 @@ class Instance(Entity, ServiceMixin, InstanceRouter):
     @property
     def parameters(self):
         # todo: Public api hack.
-        j = self.json()
+        j = self.json(retry_query=False)
         if self._router.public_api_in_use:  # We do not have 'revision' in public api
             return j['parameters']
 
@@ -182,7 +181,7 @@ class Instance(Entity, ServiceMixin, InstanceRouter):
 
     @property
     def currentWorkflow(self):
-        j = self.json()
+        j = self.json(retry_query=False)
         #TODO: FIXME: get rid of old API when its support will be removed
         # We could get {} or None for both together. Dependant code expects dict(), so, returning dict.
         if j.get('currentWorkflow', {}):
@@ -201,7 +200,7 @@ class Instance(Entity, ServiceMixin, InstanceRouter):
         #TODO: FIXME: old API support: remove when its support will be removed on server
         elif key in ['workflowHistory', 'scheduledWorkflows', 'availableWorkflows']:
             log.debug('Getting instance workflow attribute: %s' % key)
-            j = self.json()
+            j = self.json(retry_query=False)
             old_api_value = j.get(key)
             new_api_value = j.get('workflowsInfo', {}).get(key, False)
             atr = new_api_value or old_api_value or []
@@ -213,10 +212,9 @@ class Instance(Entity, ServiceMixin, InstanceRouter):
             log.debug(atr)
             return atr
 
-    # TODO: make such behaviour default
     @property
-    @retry(3, 1, 3, retry_exception=(KeyError, AssertionError))
-    def technicalInfo(self): # This property is not always there. Waiting to appear
+    def technicalInfo(self):
+        # This property is not always there. Waiting to appear
         ret = self.json()['technicalInfo']
         assert isinstance(ret, dict)
         return ret
@@ -233,7 +231,7 @@ class Instance(Entity, ServiceMixin, InstanceRouter):
         elapsed = (now - self.__last_read_time) * 1000.0
         return elapsed < 300
 
-    def json(self):
+    def json(self, retry_query=True):
         """
         return __cached_json, if accessed withing 300 ms.
         This allows to optimize calls when many parameters of entity requires withing short time.
@@ -243,7 +241,9 @@ class Instance(Entity, ServiceMixin, InstanceRouter):
             return self.__cached_json
         # noinspection PyAttributeOutsideInit
         self.__last_read_time = time.time()
-        self.__cached_json = self._router.get_instance(org_id=self.organizationId, instance_id=self.instanceId).json()
+        self.__cached_json = Response(data_fn=self._router.get_instance(org_id=self.organizationId, instance_id=self.instanceId).json,
+                                      cache_ttl=300,
+                                      retry_query=retry_query)
         return self.__cached_json
 
     @staticmethod
