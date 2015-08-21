@@ -21,7 +21,6 @@ from qubell.api.tools import is_bson_id
 from qubell.api.private import exceptions
 from qubell import deprecated
 
-
 __author__ = "Vasyl Khomenko"
 __copyright__ = "Copyright 2013, Qubell.com"
 __license__ = "Apache"
@@ -144,3 +143,27 @@ class Auth(object):
 
         # TODO: parse tenant to generate api url
         self.api = tenant
+
+
+class Cached(object):
+    __cached_data = None
+    __cached_time = None
+
+    def __init__(self, data_fn, cache_ttl=300):
+        self.data_fn = data_fn
+        self.cache_ttl = cache_ttl
+
+    def is_data_cached(self):
+        if self.__cached_data is None:
+            return False
+        now = time.time()
+        elapsed = (now - self.__cached_time) * 1000.0
+        return elapsed < self.cache_ttl
+
+    def get(self):
+        if self.is_data_cached():
+            return self.__cached_data
+        else:
+            self.__cached_time = time.time()
+            self.__cached_data = self.data_fn()
+            return self.__cached_data

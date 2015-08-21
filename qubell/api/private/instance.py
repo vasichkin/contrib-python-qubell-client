@@ -23,7 +23,7 @@ from qubell.api.private.service import ServiceMixin
 from qubell.api.tools import lazyproperty, retry
 from qubell.api.tools import waitForStatus as waitForStatus
 from qubell.api.private import exceptions
-from qubell.api.private.common import QubellEntityList, Entity
+from qubell.api.private.common import QubellEntityList, Entity, Cached
 from qubell.api.provider.router import InstanceRouter
 
 __author__ = "Vasyl Khomenko"
@@ -45,7 +45,6 @@ class Instance(Entity, ServiceMixin, InstanceRouter):
         self.organization = organization
         self.organizationId = organization.organizationId
 
-        self.__cached_json = None
         self._last_workflow_started_time = None
 
     @lazyproperty
@@ -221,30 +220,8 @@ class Instance(Entity, ServiceMixin, InstanceRouter):
         assert isinstance(ret, dict)
         return ret
 
-    def _cache_free(self):
-        """Frees cache"""
-        self.__cached_json = None
-
-    def fresh(self):
-        # todo: create decorator from this
-        if self.__cached_json is None:
-            return False
-        now = time.time()
-        elapsed = (now - self.__last_read_time) * 1000.0
-        return elapsed < 300
-
     def json(self):
-        """
-        return __cached_json, if accessed withing 300 ms.
-        This allows to optimize calls when many parameters of entity requires withing short time.
-        """
-
-        if self.fresh():
-            return self.__cached_json
-        # noinspection PyAttributeOutsideInit
-        self.__last_read_time = time.time()
-        self.__cached_json = self._router.get_instance(org_id=self.organizationId, instance_id=self.instanceId).json()
-        return self.__cached_json
+        return Cached(data_fn=self._router.get_instance(org_id=self.organizationId, instance_id=self.instanceId).json)
 
     @staticmethod
     def new(router, application, revision=None, environment=None, name=None, parameters=None,
