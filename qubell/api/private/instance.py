@@ -46,6 +46,7 @@ class Instance(Entity, ServiceMixin, InstanceRouter):
         self.organizationId = organization.organizationId
 
         self._last_workflow_started_time = None
+        self.__cached_json = Cached(data_fn=self._router.get_instance(org_id=self.organizationId, instance_id=self.instanceId).json)
 
     @lazyproperty
     def application(self):
@@ -221,7 +222,7 @@ class Instance(Entity, ServiceMixin, InstanceRouter):
         return ret
 
     def json(self):
-        return Cached(data_fn=self._router.get_instance(org_id=self.organizationId, instance_id=self.instanceId).json)
+        return self.__cached_json.get()
 
     @staticmethod
     def new(router, application, revision=None, environment=None, name=None, parameters=None,
