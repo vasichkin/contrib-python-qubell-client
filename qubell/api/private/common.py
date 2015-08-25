@@ -188,7 +188,9 @@ class Response(dict):
     def get_key(self, key):
         log.debug("Response: Getting key: %s" % key)
         self.data = self.data_fn()
-        return self.data[key]
+        resp = Response(data_fn=self.data_fn.__getitem__(key), retry_query=self.retry)
+        print resp
+        return resp
 
     def get_data(self):
         self.data = self.data_fn()
@@ -205,6 +207,7 @@ class Response(dict):
         return pprint.pformat(self.get_data())
 
     def __getitem__(self, key):
+        print "GetItem %s" % key
         if self.retry:
             return self.get_data_retry(key)
         else:

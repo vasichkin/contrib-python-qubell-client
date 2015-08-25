@@ -1,6 +1,7 @@
 import unittest
 from qubell.api.private.common import Response
-from qubell.api.private.common import EntityList, QubellEntityList
+from qubell.api.private.common import QubellEntityList
+from unittest import skip
 
 class Stubs(object):
     count = 0
@@ -92,3 +93,40 @@ class test_Response(unittest.TestCase):
         assert sub.submodules
         assert sub.submodules[0]
 
+    # TODO
+    @skip('WaitFor should handle this')
+    def test_retry_while_none_in_response(self):
+        # Check Response class retries if there missing key in child
+        resp = Response(data_fn=lambda: self.stubs.respond_with_given_data_first({'bb': None}))
+        assert resp['bb'][0]['aaaa']
+        assert resp.tries_count == 3
+
+    # TODO
+    @skip('WaitFor should handle this')
+    def test_retry_while_empty_dict_in_response(self):
+        # Check Response class retries if there missing key in child
+        resp = Response(data_fn=lambda: self.stubs.respond_with_given_data_first({'bb': {}}))
+        assert resp['bb'][0]['aaaa']
+        assert resp.tries_count == 3
+
+    # TODO
+    @skip('WaitFor should handle this')
+    def test_retry_while_empty_list_in_response(self):
+        # Check Response class retries if there missing key in child
+        resp = Response(data_fn=lambda: self.stubs.respond_with_given_data_first({'bb': []}))
+        assert resp['bb'][0]['aaaa']
+        assert resp.tries_count == 3
+
+    def test_retry_while_empty_dict_list_in_response(self):
+        # Check Response class retries if there missing key in child
+        resp = Response(data_fn=lambda: self.stubs.respond_with_given_data_first({'bb': [{}]}))
+        assert resp['bb'][0]['aaaa']
+        assert resp.tries_count == 3
+
+    # TODO: waitfor tests
+    """
+    stub = {'bb':['i1', 'i2']}
+    stub = {'bb':[{'bbbb':None}]}
+    stub = {'bb':[{'bbbb':[]}]}
+    stub = {'bb':[{'bbbb':{}}]}
+    """
