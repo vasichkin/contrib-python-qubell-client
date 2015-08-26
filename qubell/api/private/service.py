@@ -59,7 +59,7 @@ class ServiceMixin(object):
 
     def get_public_key(self, key_id=None):
         if not key_id:
-            key_id = self.userData['defaultKey']
+            key_id = str(self.userData['defaultKey'])
         return self._router.get_service_public_key(org_id=self.organizationId,
                                                    instance_id=self.instanceId, key_id=key_id).text
 

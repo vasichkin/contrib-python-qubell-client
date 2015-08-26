@@ -17,10 +17,9 @@ import logging as log
 import time
 from qubell.api.provider.router import InstanceRouter
 
-from qubell.api.tools import is_bson_id, retry
+from qubell.api.tools import is_bson_id
 from qubell.api.private import exceptions
 from qubell import deprecated
-import pprint
 
 __author__ = "Vasyl Khomenko"
 __copyright__ = "Copyright 2013, Qubell.com"
@@ -154,64 +153,70 @@ class Response(dict):
 
     Note, nested dicts (dict(dict(...)) are not processed separately, as KeyError thrown for internal dict, forcing us to retry.
     """
-    tries_count = 0
+    tries_left = 0
     data = None
 
-    def __init__(self, data_fn, retry_query=True):
+    def __init__(self, data_fn, retry_query=True, tries=10, delay=1, backoff=1.1):
         self.data_fn = data_fn
         self.retry = retry_query
+        self.tries_left = tries
+        self.delay = delay
+        self.backoff = backoff
+        self.exceptions = (KeyError, exceptions.NotFoundError)
 
+    def update_data(self):
+        self.raw = self.data_fn()
+        self.data = GetItemFailSafe(self.raw,
+                                    fallback_fn=self.retry_path)
+        return self.data
 
-    def get_data_retry(self, key, tries=10, delay=1, backoff=1.1, retry_exception=(KeyError, exceptions.NotFoundError)):
+    def retry_path(self, path=[]):
         """
-        Retry "tries" times, with initial "delay", increasing delay "delay*backoff" each time.
+        Retry "self.tries_left" times, with initial "delay", increasing delay "delay*backoff" each time.
         Without exception success means when function returns valid object.
         With exception success when no exceptions
         """
-        mtries, mdelay = tries, delay
-        log.debug("Response: Start retry (%s, %s, %s) for key: %s" % (tries, delay, backoff, key))
-        while mtries > 0:
-            mdelay *= backoff
+        if not path:
+            return
+        mdelay = self.delay
+        log.debug("Response: Geting key %s  with retry (%s, %s, %s)" % (path, self.tries_left, self.delay, self.backoff))
+        while self.tries_left > 0:
+            if isinstance(self.raw, dict):
+                data = self.raw.copy()
+            else:
+                data = self.raw
+            mdelay *= self.backoff
             try:
-                return self.get_key(key)
-            except retry_exception:
+                self.update_data()
+                for hop in path:
+                    data = data.__getitem__(hop)
+                return data
+            except self.exceptions:
                 pass
-
-            mtries -= 1
-            if mtries <= 0:
-                return self.get_key(key) # extra try, to avoid except-raise syntax
-            log.debug("{0} try, sleeping for {1} sec".format(tries-mtries, mdelay))
-            self.tries_count = tries-mtries
+            self.tries_left -= 1
+            if self.tries_left <= 0:
+                log.debug("Response: Giving up..\n Key path: {0}\n Source data:\n {1}\n".format(path, self.raw))
+                return data[hop] # extra try, we should raise here with right exception
+            log.debug("Response: Tries left: {0}, sleeping for {1} sec".format(self.tries_left, mdelay))
             time.sleep(mdelay)
         raise Exception("unreachable code")
-
-    def get_key(self, key):
-        log.debug("Response: Getting key: %s" % key)
-        self.data = self.data_fn()
-        resp = Response(data_fn=self.data_fn.__getitem__(key), retry_query=self.retry)
-        print resp
-        return resp
-
-    def get_data(self):
-        self.data = self.data_fn()
-        return self.data
 
     def __iter__(self):
         for x in self.data:
             yield x
 
     def __repr__(self):
-        return pprint.pformat(self.get_data())
+        return self.update_data()
 
     def __str__(self):
-        return pprint.pformat(self.get_data())
+        return str(self.update_data())
 
-    def __getitem__(self, key):
-        print "GetItem %s" % key
+    def __getitem__(self, item):
+        self.update_data()
         if self.retry:
-            return self.get_data_retry(key)
+            return self.data.__getitem__(item)
         else:
-            return self.get_key(key)
+            return self.data_fn().__getitem__(item)
 
     def get(self, key, default=None):
         try:
@@ -219,6 +224,45 @@ class Response(dict):
         except KeyError:
             return default
 
-    def __call__(self, *args, **kwargs):
-        return self.get_data()
 
+class GetItemFailSafe(object):
+    def __init__(self, data, fallback_fn, path=[]):
+        self.data = data
+        self.fallback_fn = fallback_fn
+        self.path = path
+
+    def __getitem__(self, item):
+        newpath = self.path+[item]
+        try:
+            value = GetItemFailSafe(self.data[item], fallback_fn=self.fallback_fn, path=newpath)
+        except:
+            value = self.fallback_fn(newpath)
+        return value
+
+    def __repr__(self):
+        return self.data
+
+    def __str__(self):
+        return str(self.data)
+
+    def __call__(self, *args, **kwargs):
+        return self.data
+
+    def __eq__(self, other):
+        return self.data == other
+
+    def get(self, key, default=None):
+        try:
+            return self.data[key]
+        except KeyError:
+            return default
+
+    def __cmp__(self, other):
+        return self.data == other
+
+    def __contains__(self, item):
+        return item in self.data
+
+    def __iter__(self):
+        for x in self.data:
+            yield x

@@ -250,7 +250,7 @@ class Environment(Entity, InstanceRouter):
             if service.is_secure_vault:
                 user_data = service.userData
                 if 'defaultKey' in user_data:
-                    key = user_data['defaultKey']
+                    key = str(user_data['defaultKey'])
                 else:
                     key = service.regenerate()['id']
 

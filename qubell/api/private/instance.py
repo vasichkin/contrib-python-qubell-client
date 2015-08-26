@@ -242,7 +242,6 @@ class Instance(Entity, ServiceMixin, InstanceRouter):
         # noinspection PyAttributeOutsideInit
         self.__last_read_time = time.time()
         self.__cached_json = Response(data_fn=self._router.get_instance(org_id=self.organizationId, instance_id=self.instanceId).json,
-                                      cache_ttl=300,
                                       retry_query=retry_query)
         return self.__cached_json
 
