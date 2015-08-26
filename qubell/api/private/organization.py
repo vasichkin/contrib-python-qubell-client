@@ -257,6 +257,7 @@ class Organization(Entity, InstanceRouter):
         """ Launches instance in application and returns Instance object.
         """
         from qubell.api.private.instance import Instance
+        log.info("Organization (%s): create instance request in app: %s" % (self.id, application.id))
         return Instance.new(self._router, application, revision, environment, name,
                             parameters, submodules, destroyInterval)
 

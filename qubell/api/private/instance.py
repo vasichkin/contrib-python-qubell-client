@@ -23,7 +23,7 @@ from qubell.api.private.service import ServiceMixin
 from qubell.api.tools import lazyproperty, retry
 from qubell.api.tools import waitForStatus as waitForStatus
 from qubell.api.private import exceptions
-from qubell.api.private.common import QubellEntityList, Entity, Response
+from qubell.api.private.common import QubellEntityList, Entity, RetryJson
 from qubell.api.provider.router import InstanceRouter
 
 __author__ = "Vasyl Khomenko"
@@ -114,10 +114,10 @@ class Instance(Entity, ServiceMixin, InstanceRouter):
         Private has {'id':'key', 'value':'keyvalue'} format, public has {'key':'keyvalue'}
         """
 
-        j = self.json()
+        j = self.json(retry_query=False)
         #TODO: FIXME: get rid of old API when its support will be removed
-        old_api_value = j.get('returnValues')
         new_api_value = j.get('endpoints')
+        old_api_value = j.get('returnValues')
 
         retvals = new_api_value or old_api_value or []
         # TODO: Public api hack.
@@ -127,7 +127,7 @@ class Instance(Entity, ServiceMixin, InstanceRouter):
 
     @property
     def error(self):
-        return self.json().get('errorMessage', False)
+        return self.json().get('technicalInfo', {}).get('errorMessage', False)
 
     @property
     def activitylog(self):
@@ -166,8 +166,8 @@ class Instance(Entity, ServiceMixin, InstanceRouter):
             return j['parameters']
 
         #TODO: FIXME: get rid of old API when its support will be removed
-        old_api_value = j.get('revision', {}).get('parameters')
         new_api_value = j.get('config')
+        old_api_value = j.get('revision', {}).get('parameters')
         # if not (j.get('revision') is None or j['revision'].get('parameters') is None):
         #     parameters = j['revision']['parameters']
         # else:
@@ -216,7 +216,7 @@ class Instance(Entity, ServiceMixin, InstanceRouter):
     def technicalInfo(self):
         # This property is not always there. Waiting to appear
         ret = self.json()['technicalInfo']
-        assert isinstance(ret, dict)
+        assert isinstance(ret.data, dict)
         return ret
 
     def _cache_free(self):
@@ -231,6 +231,9 @@ class Instance(Entity, ServiceMixin, InstanceRouter):
         elapsed = (now - self.__last_read_time) * 1000.0
         return elapsed < 300
 
+    def _json_query(self, org_id, instance_id):
+        return self._router.get_instance(org_id=org_id, instance_id=instance_id).json()
+
     def json(self, retry_query=True):
         """
         return __cached_json, if accessed withing 300 ms.
@@ -241,8 +244,9 @@ class Instance(Entity, ServiceMixin, InstanceRouter):
             return self.__cached_json
         # noinspection PyAttributeOutsideInit
         self.__last_read_time = time.time()
-        self.__cached_json = Response(data_fn=self._router.get_instance(org_id=self.organizationId, instance_id=self.instanceId).json,
-                                      retry_query=retry_query)
+        self.__cached_json = RetryJson(data_fn=self._json_query,
+                                       kwargs={'org_id': self.organizationId, 'instance_id': self.instanceId},
+                                       retry_query=retry_query)
         return self.__cached_json
 
     @staticmethod
@@ -253,6 +257,7 @@ class Instance(Entity, ServiceMixin, InstanceRouter):
             environment = application.organization.defaultEnvironment
 
         if not environment.isOnline:
+            log.info("Checking environment (%s) is online" % environment.id)
             # If environment offline for any reason, let it come up. Otherwise raise error
             @retry(tries=10, delay=1, backoff=1.5, retry_exception=AssertionError)
             def eventually_online():
@@ -299,7 +304,6 @@ class Instance(Entity, ServiceMixin, InstanceRouter):
         if environment:
             q_filter["environmentFilterId"] = environment.environmentId
         resp_json = router.get_instances(org_id=organization.organizationId, params=q_filter).json()
-
         def instance_not_found_pretty():
             return exceptions.NotFoundError(
                 "Instance with '{0}' not found in organization {1}".format(name, organization.name))
@@ -315,20 +319,24 @@ class Instance(Entity, ServiceMixin, InstanceRouter):
             return Instance(organization=organization, id=sorted(instances, key=lambda i: i["createdAt"])[-1]['id']).init_router(router)
 
     def ready(self, timeout=3):  # Shortcut for convinience. Timeout = 3 min (ask timeout*6 times every 10 sec)
-        accepted_states = ['Launching', 'Requested', 'Executing', 'Unknown']
+        log.debug("Instance (%s) ready request" % self.id)
+        accepted_states = ['Launching', 'Requested', 'Executing', 'Unknown', 'Error']
         return waitForStatus(instance=self, final=['Active', 'Running'],
                              accepted=accepted_states, timeout=[timeout*20, 3, 1])
         # TODO: Unknown status  should be removed
 
     def launching(self, timeout=3):
+        log.debug("Instance (%s) launching request" % self.id)
         accepted_states = ['Active', 'Running', 'Unknown', 'Executing']
         return waitForStatus(instance=self, final='Launching', accepted=accepted_states, timeout=[timeout*20, 3, 1])
 
     def failed(self, timeout=3):
+        log.debug("Instance (%s) failed request" % self.id)
         accepted_states = ['Active', 'Running', 'Unknown', 'Executing']
         return waitForStatus(instance=self, final='Error', accepted=accepted_states, timeout=[timeout*20, 3, 1])
 
     def running(self, timeout=3):
+        log.debug("Instance (%s) running request" % self.id)
         if self.status in ['Active', 'Running']:
             log.debug("Instance {} is Active right now".format(self.id))
             return True
@@ -338,7 +346,8 @@ class Instance(Entity, ServiceMixin, InstanceRouter):
         return self.ready(timeout)
 
     def destroyed(self, timeout=3):  # Shortcut for convenience. Timeout = 3 min (ask timeout*6 times every 10 sec)
-        accepted_states = ['Destroying', 'Active', 'Running', 'Executing', 'Unknown']
+        log.debug("Instance destroyed (%s) request" % self.id)
+        accepted_states = ['Destroying', 'Active', 'Running', 'Executing', 'Unknown', 'Error']
         return waitForStatus(instance=self, final='Destroyed', accepted=accepted_states, timeout=[timeout*20, 3, 1])
 
     def run_workflow(self, name, component_path=None, parameters=None):
@@ -492,7 +501,7 @@ class Instance(Entity, ServiceMixin, InstanceRouter):
         else:
             most_recent = None
         if last and most_recent:
-            return last < most_recent
+            return last <= most_recent
         return False  # can be more clever
 
 
@@ -587,14 +596,12 @@ class ActivityLog(object):
 
     def get_interval(self, start_text=None, end_text=None):
         if start_text:
-            begin = self.find(start_text)
-            interval = ActivityLog(self.log, self.severity, start=begin[0])
+            interval = ActivityLog(self.log, self.severity, start=self.find(start_text)[0])
         else:
             interval = self
 
         if end_text:
-            end = interval.find(end_text)
-            interval = ActivityLog(interval, self.severity, end=end[0])
+            interval = ActivityLog(interval, self.severity, end=interval.find(end_text)[0])
 
         if len(interval):
             return interval

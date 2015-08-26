@@ -145,9 +145,9 @@ class Auth(object):
         self.api = tenant
 
 
-class Response(dict):
+class RetryJson(dict):
     """
-    Base class for response object. This class provides retry capabilities for Router queries.
+    Base class for RetryJson object. This class provides retry capabilities for Router queries.
     Class mimics dict() in usage.
     If got KeyError, retry query until got key or timeout.
 
@@ -156,16 +156,19 @@ class Response(dict):
     tries_left = 0
     data = None
 
-    def __init__(self, data_fn, retry_query=True, tries=10, delay=1, backoff=1.1):
+    def __init__(self, data_fn, args=[], kwargs={}, retry_query=True, tries=10, delay=1, backoff=1.1):
         self.data_fn = data_fn
         self.retry = retry_query
         self.tries_left = tries
         self.delay = delay
         self.backoff = backoff
-        self.exceptions = (KeyError, exceptions.NotFoundError)
+        self.args = args
+        self.kwargs = kwargs
+        # Exceptions, that valid for retry data.
+        self.exceptions = (KeyError, IndexError, TypeError, exceptions.NotFoundError)
 
     def update_data(self):
-        self.raw = self.data_fn()
+        self.raw = self.data_fn(*self.args, **self.kwargs)
         self.data = GetItemFailSafe(self.raw,
                                     fallback_fn=self.retry_path)
         return self.data
@@ -179,7 +182,7 @@ class Response(dict):
         if not path:
             return
         mdelay = self.delay
-        log.debug("Response: Geting key %s  with retry (%s, %s, %s)" % (path, self.tries_left, self.delay, self.backoff))
+        log.debug("RetryJson: Geting key %s  with retry (%s, %s, %s)" % (path, self.tries_left, self.delay, self.backoff))
         while self.tries_left > 0:
             if isinstance(self.raw, dict):
                 data = self.raw.copy()
@@ -195,18 +198,19 @@ class Response(dict):
                 pass
             self.tries_left -= 1
             if self.tries_left <= 0:
-                log.debug("Response: Giving up..\n Key path: {0}\n Source data:\n {1}\n".format(path, self.raw))
+                log.debug("RetryJson: Giving up..\n Key path: {0}\n Source data:\n {1}\n".format(path, self.raw))
                 return data[hop] # extra try, we should raise here with right exception
-            log.debug("Response: Tries left: {0}, sleeping for {1} sec".format(self.tries_left, mdelay))
+            log.debug("RetryJson: Tries left: {0}, sleeping for {1} sec".format(self.tries_left, mdelay))
             time.sleep(mdelay)
         raise Exception("unreachable code")
 
     def __iter__(self):
-        for x in self.data:
+        self.update_data()
+        for x in self.raw:
             yield x
 
     def __repr__(self):
-        return self.update_data()
+        return str(self.update_data())
 
     def __str__(self):
         return str(self.update_data())
@@ -214,9 +218,11 @@ class Response(dict):
     def __getitem__(self, item):
         self.update_data()
         if self.retry:
+            log.debug("RetryJson: Key request (with retry): %s" % item)
             return self.data.__getitem__(item)
         else:
-            return self.data_fn().__getitem__(item)
+            log.debug("RetryJson: Key request: %s" % item)
+            return self.raw.__getitem__(item)
 
     def get(self, key, default=None):
         try:
@@ -225,11 +231,12 @@ class Response(dict):
             return default
 
 
-class GetItemFailSafe(object):
+class GetItemFailSafe(dict):
     def __init__(self, data, fallback_fn, path=[]):
         self.data = data
         self.fallback_fn = fallback_fn
         self.path = path
+        self.datatype = type(self.data)
 
     def __getitem__(self, item):
         newpath = self.path+[item]
@@ -240,13 +247,13 @@ class GetItemFailSafe(object):
         return value
 
     def __repr__(self):
-        return self.data
+        return str(self.data)
 
     def __str__(self):
         return str(self.data)
-
-    def __call__(self, *args, **kwargs):
-        return self.data
+#
+#    def __call__(self, *args, **kwargs):
+#        return self.data
 
     def __eq__(self, other):
         return self.data == other
@@ -266,3 +273,8 @@ class GetItemFailSafe(object):
     def __iter__(self):
         for x in self.data:
             yield x
+
+    def __len__(self):
+        if isinstance(self.data, (dict, list)):
+            return len(self.data)
+

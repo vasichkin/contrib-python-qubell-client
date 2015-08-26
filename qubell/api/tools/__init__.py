@@ -77,7 +77,7 @@ def waitForStatus(instance, final='Active', accepted=None, timeout=(20, 10, 1)):
 
     if not isinstance(final, list): final = [final]
 
-    @retry(3, 1, 2)  # max = 1 + 2 + 4 = 7 seconds + routes time
+    @retry(3, 2, 2)  # max = 1 + 2 + 4 = 7 seconds + routes time
     def projection_update_monitor():
         """
         We have to deal with lag when projection updates instance.

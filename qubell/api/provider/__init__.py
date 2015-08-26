@@ -82,8 +82,10 @@ def route(route_str):  # decorator param
 
             if self.verify_codes:
                 if response.status_code is not 200:
-                    msg = "Route {0} {1} returned code={2} and error: {3}".format(method, get_destination_url(), response.status_code,
-                                                                              response.text)
+                    msg = "Route {0} {1} returned code={2} and error: {3}".format(method,
+                                                                                  get_destination_url(),
+                                                                                  response.status_code,
+                                                                                  response.text)
                     if response.status_code in api_http_code_errors.keys():
                         raise api_http_code_errors[response.status_code](msg)
                     else:
