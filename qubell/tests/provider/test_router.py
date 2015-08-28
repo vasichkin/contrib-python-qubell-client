@@ -1,4 +1,4 @@
-from mock import patch, Mock
+from mock import patch, Mock, MagicMock
 import unittest
 
 from qubell.api.private.exceptions import ApiUnauthorizedError
@@ -24,26 +24,7 @@ class RouterTests(unittest.TestCase):
         with patch.object(self.router, "_cookies", {"eat": "this"}):
             assert not self.router.is_connected
 
-    def test_get_connected(self):
-        cooka = {"PLAY_SESSION": "damn_cookie_mock"}
-
-        def session_mock():
-            session = Mock(cookies=cooka)
-            session.__enter__ = lambda self: session
-            session.__exit__ = Mock()
-            return session
-
-        with patch("requests.session", return_value=session_mock()):
-            self.router.connect("any@where", "***")
-        assert self.router.is_connected
-        assert self.router._cookies == cooka
-        # seems pretty fast, didn't mock
-        assert self.router._auth.username == "any@where"
-        assert self.router._auth.password == "***"
-
-
     def test_exception_if_not_get_connected(self):
         with self.assertRaises(ApiUnauthorizedError) as context, patch("requests.session"):
             self.router.connect("any@where", "**wrong**")
         assert str(context.exception) == "Authentication failed, please check settings"
-

@@ -23,20 +23,22 @@ import os
 
 from qubell.api.testing import *
 
+
 def manifest(name):
     return os.path.realpath(os.path.join(os.path.dirname(__file__), name))
 
-@environment(
-    {'default':
-         {'policies':[{'action': 'provisionVms', 'parameter': 'imageId', 'value': 'reg/ami-777'},
-                      {'action': 'provisionVms', 'parameter': 'vmIdentity', 'value': 'ubuntu7'}]},
-     'custom':
-         {'policies':[{'action': 'provisionVms', 'parameter': 'imageId', 'value': 'reg/ami-888'},
-                      {'action': 'provisionVms', 'parameter': 'vmIdentity', 'value': 'ubuntu8'}],
-          'markers': ['test-marker'],
-          'properties': [{'name': 'testprop', 'type':'string', 'value':'test-prop value'}]
-         }
-    })
+
+@environment({
+    'default': {
+        'policies': [{'action': 'provisionVms', 'parameter': 'imageId', 'value': 'reg/ami-777'},
+                     {'action': 'provisionVms', 'parameter': 'vmIdentity', 'value': 'ubuntu7'}]
+        },
+    'custom': {
+        'policies': [{'action': 'provisionVms', 'parameter': 'imageId', 'value': 'reg/ami-888'},
+                     {'action': 'provisionVms', 'parameter': 'vmIdentity', 'value': 'ubuntu8'}],
+        'markers': ['test-marker'],
+        'properties': [{'name': 'testprop', 'type': 'string', 'value': 'test-prop value'}]
+    }})
 class SandboxClassTest(BaseComponentTestCase):
     name = 'SelfSandboxTest'
     apps = [{"name": name,
@@ -44,8 +46,9 @@ class SandboxClassTest(BaseComponentTestCase):
              "settings": {"destroyInterval": 300000},
              "parameters": {
                  "in.app_input": "dddd"}
-            }]
+             }]
 
+    # noinspection PyShadowingNames
     @instance(byApplication=name)
     def test_instance(self, instance):
         assert 'Active' == instance.status
@@ -56,10 +59,10 @@ class SandboxClassTest(BaseComponentTestCase):
         default_env = self.organization.environments['default'].json()
         custom_env = self.organization.environments['custom'].json()
 
-        assert 'reg/ami-777' in [ x['value'] for x in default_env['policies']]
-        assert 'ubuntu7' in [ x['value'] for x in default_env['policies']]
+        assert 'reg/ami-777' in [x['value'] for x in default_env['policies']]
+        assert 'ubuntu7' in [x['value'] for x in default_env['policies']]
 
-        assert 'ubuntu8' in [ x['value'] for x in custom_env['policies']]
-        assert 'reg/ami-888' in [ x['value'] for x in custom_env['policies']]
-        assert 'test-marker' in [ x['name'] for x in custom_env['markers']]
-        assert 'test-prop value' in [ x['value'] for x in custom_env['properties']]
+        assert 'ubuntu8' in [x['value'] for x in custom_env['policies']]
+        assert 'reg/ami-888' in [x['value'] for x in custom_env['policies']]
+        assert 'test-marker' in [x['name'] for x in custom_env['markers']]
+        assert 'test-prop value' in [x['value'] for x in custom_env['properties']]

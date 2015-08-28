@@ -109,22 +109,23 @@ class Organization(Entity, InstanceRouter):
     def ready(self):
         """
         Checks if organization properly created.
-        Note: Cannot use DEFAULT_ENV_NAME and services, since it checks services in default zone without prefixes
+        Note: New organization must have 'default' environment and two default services
+        running there. Cannot use DEFAULT_ENV_NAME, because zone could be added there.
         :rtype: bool
         """
-        env = self.environments['default']
 
         @retry(tries=3, retry_exception=exceptions.NotFoundError)  # org init, takes some times
         def check_init():
+            env = self.environments['default']
             return env.services['Default workflow service'].running(timeout=1) and \
-                env.services['Default credentials service'].running(timeout=1)
+                   env.services['Default credentials service'].running(timeout=1)
         return check_init()
 
     def restore(self, config, clean=False, timeout=10):
         config = copy.deepcopy(config)
 
         for app in config.pop('applications'):
-            manifest_param = {k: v for k, v in app.iteritems() if k in ["content", "url", "file"]}
+            manifest_param = dict([(k, v) for k, v in app.iteritems() if k in ["content", "url", "file"]])
             if manifest_param:
                 manifest = Manifest(**manifest_param)
             else:
@@ -267,13 +268,19 @@ class Organization(Entity, InstanceRouter):
             return Instance(id=id, organization=self).init_router(self._router)
         return Instance.get(self._router, self, name)
 
-    def list_instances_json(self, application=None):
+    def list_instances_json(self, application=None, show_only_destroyed=False):
         """ Get list of instances in json format converted to list"""
         # todo: application should not be parameter here. Application should do its own list, just in sake of code reuse
-        q_filter = {"showDestroyed": "false",
-                  "sortBy": "byCreation", "descending": "true",
-                  "mode": "short",
-                  "from": "0", "to": "10000"}
+        q_filter = {'sortBy': 'byCreation', 'descending': 'true',
+                    'mode': 'short',
+                    'from': '0', 'to': '10000'}
+        if not show_only_destroyed:
+            q_filter['showDestroyed'] = 'false'
+        else:
+            q_filter['showDestroyed'] = 'true'
+            q_filter['showRunning'] = 'false'
+            q_filter['showError'] = 'false'
+            q_filter['showLaunching'] = 'false'
         if application:
             q_filter["applicationFilterId"] = application.applicationId
         resp_json = self._router.get_instances(org_id=self.organizationId, params=q_filter).json()
@@ -282,7 +289,7 @@ class Organization(Entity, InstanceRouter):
         else:  # TODO: This is compatibility fix for platform < 37.1
             instances = resp_json
 
-        return [ins for ins in instances if ins['status'] not in DEAD_STATUS]
+        return instances
 
     def get_or_create_instance(self, id=None, application=None, revision=None, environment=None, name=None, parameters=None, submodules=None,
                                destroyInterval=None):
@@ -321,6 +328,19 @@ class Organization(Entity, InstanceRouter):
 
         return instance
 
+### COMPONENTS
+    #full components id, starts with instance id.
+    def component_details(self, component):
+        return self._router.get_component_details(org_id=self.organizationId, component_id=component).json()
+
+    def list_components_json(self, application=None):
+
+        q_filter = {'sortBy': 'byCreation','descending': 'true',
+                    'from': '0', 'to': '10000'}
+        if application:
+            q_filter["applicationFilterId"] = application.applicationId
+
+        return self._router.get_components(org_id=self.organizationId, params=q_filter).json()
 
 ### SERVICE
     def create_service(self, application=None, revision=None, environment=None, name=None, parameters=None, type=None):
@@ -514,7 +534,7 @@ class Organization(Entity, InstanceRouter):
         :return:
         """
         if roles is None:
-            role_ids = list(self.roles['Guest'].roleId)
+            role_ids = [self.roles['Guest'].roleId]
         elif roles == "ALL":
             role_ids = list([i.id for i in self.roles])
         else:

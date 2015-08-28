@@ -13,6 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import re
+import functools
 
 __author__ = "Vasyl Khomenko"
 __copyright__ = "Copyright 2013, Qubell.com"
@@ -42,6 +43,7 @@ def retry(tries=10, delay=1, backoff=2, retry_exception=None):
     catching_mode = bool(retry_exception)
 
     def deco_retry(f):
+        @functools.wraps(f)
         def f_retry(*args, **kwargs):
             mtries, mdelay = tries, delay
 
@@ -108,15 +110,13 @@ def waitForStatus(instance, final='Active', accepted=None, timeout=(20, 10, 1)):
     elif cur_status in ['Error']:
         log.error("\n\n\nInstance didn't get one of {0} statuses, current status :'{1}'. \n\n"
                   "Instance: {2} ({3})\n"
-                  "Application: {4} ({5})\n"
-                  "Organization: {6} ({7})\n"
-                  "Timeout: {8} sec\n"
+                  "Organization: {4} ({5})\n"
+                  "Timeout: {6} sec\n"
                   "---------------- Error Text ---------------------\n"
-                  "{9}"
+                  "{7}"
                   "\n-------------- Error Text End -----------------\n".format(
             final, cur_status,
             instance.name, instance.id,
-            instance.application.name, instance.application.id,
             instance.organization.name, instance.organization.id,
             timeout[0]*timeout[1]*timeout[2],
             instance.error))
@@ -128,12 +128,10 @@ def waitForStatus(instance, final='Active', accepted=None, timeout=(20, 10, 1)):
     else:
         log.error("\n\n\nInstance didn't get one of {0} statuses, current status :'{1}'. \n\n"
                   "Instance: {2} ({3})\n"
-                  "Application: {4} ({5})\n"
-                  "Organization: {6} ({7})\n"
-                  "Timeout: {8} sec\n\n".format(
+                  "Organization: {4} ({5})\n"
+                  "Timeout: {6} sec\n\n".format(
             final, cur_status,
             instance.name, instance.id,
-            instance.application.name, instance.application.id,
             instance.organization.name, instance.organization.id,
             timeout[0]*timeout[1]*timeout[2]))
         log.debug(instance.get_activitylog(severity=['ERROR', 'INFO']))

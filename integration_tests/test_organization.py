@@ -19,14 +19,10 @@ __license__ = "Apache"
 __version__ = "1.0.1"
 __email__ = "vkhomenko@qubell.com"
 
-import os
-
 from base import BaseTestCase
-from qubell.api.private.manifest import Manifest
 
 
 class OrganizationClassTest(BaseTestCase):
-
 
     def test_organizations_sugar(self):
         platform = self.platform
@@ -41,18 +37,6 @@ class OrganizationClassTest(BaseTestCase):
         for x in platform.organizations:
             self.assertTrue(x.name)
 
-    """ Skip since we cannot delete organization
-    def test_organization_create_method(self):
-        # Check we can create organization
-        my_org = self.platform.create_organization(name='organizations-test')
-        self.assertTrue(my_org.name)
-        self.assertTrue(my_org in self.platform.organizations)
-
-        new_org = self.platform.get_organization(id=my_org.id)
-        self.assertEqual(my_org, new_org)
-        self.assertTrue(my_org.delete())
-    """
-
     def test_get_or_create_organization_method(self):
         org = self.organization
         platform = self.platform
@@ -60,16 +44,7 @@ class OrganizationClassTest(BaseTestCase):
         self.assertEqual(org, platform.get_or_create_organization(id=org.id))
         self.assertEqual(org, platform.get_or_create_organization(name=org.name))
 
-        """ Skip since we cannot delete organization
-        # Create tests
-        new_org = platform.get_or_create_organization(name='Self-get_or_create_organization-test')
-        self.assertTrue(new_org in platform.organizations)
-        self.assertTrue(new_org.id)
-        self.assertEqual(new_org.name, 'Self-get_or_create_organization-test')
-        self.assertTrue(new_org.delete())
-        """
-
     def test_current_user_info(self):
-        org=self.organization
+        org = self.organization
         self.assertTrue(org.current_user['name'])
-        self.assertEqual(org.current_user['roles'], ["Administrator","Guest"])
+        self.assertEqual(org.current_user['roles'], ["Administrator", "Guest"])

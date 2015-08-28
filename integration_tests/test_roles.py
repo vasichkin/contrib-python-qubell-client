@@ -57,4 +57,3 @@ class RolesClassTest(BaseTestCase):
         # clean
         self.assertTrue(role.delete())
         self.assertFalse(role in self.org.roles)
-

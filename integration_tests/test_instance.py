@@ -20,25 +20,24 @@ __version__ = "1.0.1"
 __email__ = "vkhomenko@qubell.com"
 
 
-from base import BaseTestCase, eventually
+from base import BaseTestCase
+from qubell.api.testing import eventually
 from qubell.api.private.instance import Instance
 from testtools.testcase import MismatchError
 
 
 class InstanceClassTest(BaseTestCase):
 
-    @classmethod
-    def setUpClass(cls):
-        super(InstanceClassTest, cls).setUpClass()
-        cls.org = cls.organization
-        cls.app = cls.org.application(manifest=cls.manifest, name='Self-InstanceClassTest')
-        cls.ins = cls.org.create_instance(application=cls.app, name='Self-InstanceClassTest-Instance')
-        assert cls.ins.ready()
+    def setup_once(self):
+        super(InstanceClassTest, self).setup_once()
+        self.org = self.organization
+        self.app = self.org.application(manifest=self.manifest, name='Self-InstanceClassTest')
+        self.ins = self.org.create_instance(application=self.app, name='Self-InstanceClassTest-Instance')
+        assert self.ins.ready()
 
-    @classmethod
-    def tearDownClass(cls):
-        cls.ins.delete()
-        super(InstanceClassTest, cls).tearDownClass()
+    def teardown_once(self):
+        self.ins.delete()
+        super(InstanceClassTest, self).teardown_once()
 
     def test_instances_sugar(self):
         org = self.org
@@ -73,11 +72,10 @@ class InstanceClassTest(BaseTestCase):
     def test_list_instances_json(self):
         """ Check list_instances method contains our instance
         """
-
-        list = self.app.list_instances_json()
-        self.assertTrue(self.ins.id in [x['id'] for x in list])
-        list = self.org.list_instances_json()
-        self.assertTrue(self.ins.id in [x['id'] for x in list])
+        instance_list = self.app.list_instances_json()
+        self.assertTrue(self.ins.id in [x['id'] for x in instance_list])
+        instance_list = self.org.list_instances_json()
+        self.assertTrue(self.ins.id in [x['id'] for x in instance_list])
 
     def test_get_instance_from_org(self):
         """ Check ways we can get existing instance
@@ -107,7 +105,8 @@ class InstanceClassTest(BaseTestCase):
         self.assertEqual(ins, org.get_or_launch_instance(name=ins.name))
 
         # Create tests
-        my = org.get_or_launch_instance(name='Self-test_get_or_launch_instance', application=self.app, destroyInterval=100000)
+        my = org.get_or_launch_instance(name='Self-test_get_or_launch_instance',
+                                        application=self.app, destroyInterval=100000)
         self.assertTrue(my.id)
         self.assertTrue(my.ready())
         self.assertTrue(my in org.instances)
@@ -153,20 +152,18 @@ class InstanceClassTest(BaseTestCase):
         all_logs = ins.activitylog
         info_logs = ins.get_activitylog(severity='INFO')
 
-        # It's not constant
-        #self.assertEqual(len(all_logs), 14)
-        #self.assertEqual(len(info_logs), 5)
-
-
         for log in info_logs:
             assert log['severity'] == 'INFO'
 
         assert 'Active' in info_logs
         self.assertRegexpMatches(all_logs[0], 'command started: launch \(.*\) by .*')
+
         @eventually(AssertionError, MismatchError)
         def assert_eventually():
             # Last line could be one og this.
-            self.assertTrue((all_logs[-1] == 'status updated: Active') or (all_logs[-1] == "command finished: launch") or all_logs[-1] == "signals updated: This is default manifest")
+            self.assertTrue(all_logs[-1] == 'status updated: Active' or
+                            all_logs[-1] == 'command finished: launch' or
+                            all_logs[-1] == 'signals updated: This is default manifest')
         assert_eventually()
 
         self.assertRegexpMatches(info_logs[0], 'command started: launch \(.*\) by .*')
@@ -174,24 +171,7 @@ class InstanceClassTest(BaseTestCase):
         assert 'signals updated: This is default manifest' in all_logs
         assert 'This is default manifest' in all_logs
 
-        interval = info_logs.get_interval(start_text="workflow started: launch", end_text="workflow finished: launch with status \'Succeeded\'")
+        interval = info_logs.get_interval(start_text="workflow started: launch",
+                                          end_text="workflow finished: launch with status \'Succeeded\'")
         # there could be 3 or 4 messages
         self.assertTrue(len(interval) in [2, 3, 4], interval)
-
-
-    """
-    def test_instance_launch_as_service(self):
-        inst = self.org.create_instance(application=self.app, parameters={'asService': True})
-        self.assertTrue(inst.ready())
-        self.assertTrue(inst in self.org.instances)
-        self.assertEqual('This is default manifest', inst.returnValues['out.app_output'])
-
-        #SERVICE checks
-        # TODO: Should be flag in api
-        #self.assertTrue(inst.isService)
-        servs = [serv for serv in self.environment.list_services() if serv['name'] == inst.name]
-        # Check we found at least one instance with that name in environment
-        self.assertTrue(len(servs))
-
-        self.assertTrue(self.app.delete_instance(inst.instanceId))
-    """

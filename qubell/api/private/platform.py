@@ -129,7 +129,7 @@ class QubellPlatform(InstanceRouter):
                 pass
             else:
                 break
-        versions = {x['name']: x['version'] for x in backends}
+        versions = dict([(x['name'], x['version']) for x in backends])
         return versions
 
     def restore(self, config, clean=False, timeout=10):

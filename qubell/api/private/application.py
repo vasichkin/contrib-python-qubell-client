@@ -13,8 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import functools
-from qubell import deprecated
-from qubell.api.private.instance import InstanceList, DEAD_STATUS, Instance
+from qubell.api.private.instance import InstanceList, Instance
 from qubell.api.private.revision import RevisionList
 from qubell.api.tools import lazyproperty, retry
 
@@ -37,6 +36,7 @@ class Application(Entity, InstanceRouter):
     Base class for applications. It should create application and services+environment requested
     """
 
+    # noinspection PyShadowingBuiltins
     def __init__(self, organization, id):
         self.organization = organization
         self.organizationId = self.organization.organizationId
@@ -46,7 +46,13 @@ class Application(Entity, InstanceRouter):
 
     @lazyproperty
     def instances(self):
-        return InstanceList(list_json_method=self.list_instances_json, organization=self.organization).init_router(self._router)
+        return InstanceList(list_json_method=self.list_instances_json,
+                            organization=self.organization).init_router(self._router)
+
+    @lazyproperty
+    def destroyed_instances(self):
+        return InstanceList(list_json_method=self.list_destroyed_instances_json,
+                            organization=self.organization).init_router(self._router)
 
     @lazyproperty
     def revisions(self):
@@ -59,13 +65,6 @@ class Application(Entity, InstanceRouter):
     @property
     def name(self):
         return self.json()['name']
-
-
-    def __parse(self, values):
-        ret = {}
-        for val in values:
-            ret[val['id']] = val['value']
-        return ret
 
     @staticmethod
     def new(organization, name, manifest, router):
@@ -80,28 +79,31 @@ class Application(Entity, InstanceRouter):
         return app
 
     def delete(self):
-        log.info("Removing application: id=%s" % (self.applicationId))
+        log.info("Removing application: id=%s" % self.applicationId)
         self._router.delete_application(org_id=self.organizationId, app_id=self.applicationId)
         return True
 
     def update(self, **kwargs):
         if kwargs.get('manifest'):
             self.upload(kwargs.pop('manifest'))
-        log.info("Updating application: id=%s" % (self.applicationId))
+        log.info("Updating application: id=%s" % self.applicationId)
 
         data = json.dumps(kwargs)
         resp = self._router.put_application(org_id=self.organizationId, app_id=self.applicationId, data=data)
         return resp.json()
 
-    def clean(self, timeout=[7, 1, 1.5]):
+    def clean(self, timeout=None):
+        if not timeout:
+            timeout = [7, 1, 1.5]
         instances = self.instances
-        log.info("Cleaning application: id=%s" % (self.applicationId))
+        log.info("Cleaning application: id=%s" % self.applicationId)
         for ins in instances:
             if ins.status not in ['Destroyed', 'Destroying']:
                 ins.destroy()
 
         @retry(*timeout, retry_exception=AssertionError)
         def eventually_clean():
+            # noinspection PyShadowingNames
             for ins in instances:
                 assert ins.status == 'Destroyed'
         eventually_clean()
@@ -110,20 +112,27 @@ class Application(Entity, InstanceRouter):
             rev.delete()
         return True
 
+    def remove_destroyed_instances(self):
+        return self._router.delete_destroyed_instances(org_id=self.organizationId, app_id=self.applicationId).json()
+
     def json(self):
         return self._router.get_application(org_id=self.organizationId, app_id=self.applicationId).json()
 
     def list_instances_json(self):
         return self.organization.list_instances_json(application=self)
 
+    def list_destroyed_instances_json(self):
+        return self.organization.list_instances_json(application=self, show_only_destroyed=True)
+
     def __getattr__(self, key):
         resp = self.json()
-        if not resp.has_key(key):
+        if key not in resp:
             raise exceptions.NotFoundError('Cannot get property %s' % key)
         return resp[key] or False
 
 
 # REVISION
+    # noinspection PyShadowingBuiltins
     def get_revision(self, id):
         from qubell.api.private.revision import Revision
         rev = Revision(application=self, id=id).init_router(self._router)
@@ -133,30 +142,35 @@ class Application(Entity, InstanceRouter):
         # return self.json()['revisions']
         return self._router.get_revisions(org_id=self.organizationId, app_id=self.applicationId).json()
 
-    def create_revision(self, name, instance=None, parameters={}, version=None, submodules={}):
+    def create_revision(self, name, instance=None, parameters=None, version=None, submodules=None):
+        if not parameters:
+            parameters = {}
         if not version:
-            version=self.get_manifest()['manifestVersion']
+            version = self.get_manifest()['manifestVersion']
+        if not submodules:
+            submodules = {}
         if instance:
-            payload = json.dumps({ 'name': name,
-                        'parameters': parameters,
-                        'submoduleRevisions': {},
-                        'returnValues': [],
-                        'applicationId': self.applicationId,
-                        'applicationName': self.name,
-                        'manifestVersion': version,
-                        'instanceId': instance.instanceId})
+            payload = json.dumps({'name': name,
+                                  'parameters': parameters,
+                                  'submoduleRevisions': {},
+                                  'returnValues': [],
+                                  'applicationId': self.applicationId,
+                                  'applicationName': self.name,
+                                  'manifestVersion': version,
+                                  'instanceId': instance.instanceId})
             resp = self._router.post_revision(org_id=self.organizationId, app_id=self.applicationId, data=payload)
             return self.get_revision(id=resp.json()['id'])
         else:
 
-            payload = json.dumps({ 'name': name,
-                            'parameters': parameters,
-                            'submodules': submodules,
-                            'applicationId': self.applicationId,
-                            'manifestVersion': version,})
+            payload = json.dumps({'name': name,
+                                  'parameters': parameters,
+                                  'submodules': submodules,
+                                  'applicationId': self.applicationId,
+                                  'manifestVersion': version, })
             resp = self._router.post_revision_fs(org_id=self.organizationId, app_id=self.applicationId, data=payload)
             return self.get_revision(id=resp.json()['id'])
 
+    # noinspection PyShadowingBuiltins
     def delete_revision(self, id):
         self.get_revision(id).delete()
 
@@ -165,17 +179,22 @@ class Application(Entity, InstanceRouter):
     def get_manifest(self):
         return self._router.post_application_refresh(org_id=self.organizationId, app_id=self.applicationId).json()
 
+    def get_manifest_latest(self):
+        return self._router.get_application_manifests_latest(org_id=self.organizationId, app_id=self.applicationId).json()
+
     def upload(self, manifest):
         log.info("Uploading manifest: %s to application: id=%s" % (manifest.source, self.applicationId))
+        # noinspection PyAttributeOutsideInit
         self.manifest = manifest
         if self._router.public_api_in_use:
             return self._router.post_application_manifest(org_id=self.organizationId, app_id=self.applicationId,
-                                    data=manifest.content)
+                                                          data=manifest.content)
 
         return self._router.post_application_manifest(org_id=self.organizationId, app_id=self.applicationId,
-                                    files={'path': manifest.content},
-                                    data={'manifestSource': 'upload', 'name': self.name}).json()
+                                                      files={'path': manifest.content},
+                                                      data={'manifestSource': 'upload', 'name': self.name}).json()
 
+    # noinspection PyShadowingBuiltins
     def get_instance(self, id=None, name=None):
         if id:  # submodules instances are invisible for lists
             return Instance(id=id, organization=self.organization).init_router(self._router)

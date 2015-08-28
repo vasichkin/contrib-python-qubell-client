@@ -20,6 +20,8 @@ class Router(object):
 
         self._creds = None
 
+        self._session = requests.Session()
+
     @property
     def is_connected(self):
         return self._cookies and 'PLAY_SESSION' in self._cookies
@@ -31,7 +33,8 @@ class Router(object):
         data = {
             'email': email,
             'password': password}
-        with requests.session() as session:
+
+        with self._session as session:
             session.post(url=url, data=data, verify=self.verify_ssl)
             self._cookies = session.cookies
 
@@ -116,6 +119,10 @@ class PrivatePath(Router):
     @route("POST /organizations/{org_id}/applications/{app_id}/manifests{ctype}")
     def post_application_manifest(self, org_id, app_id, data, files, cookies, ctype=".json"): pass
 
+    @play_auth
+    @route("GET /organizations/{org_id}/applications/{app_id}/manifests/latest{ctype}")
+    def get_application_manifests_latest(self, org_id, app_id, cookies, ctype=".json"): pass
+
     #Revision
     @play_auth
     @route("POST /organizations/{org_id}/applications/{app_id}/createRevision{ctype}")
@@ -137,6 +144,10 @@ class PrivatePath(Router):
     @route("DELETE /organizations/{org_id}/applications/{app_id}/revisions/{rev_id}{ctype}")
     def delete_revision(self, org_id, app_id, rev_id, cookies, data="{}", ctype=".json"): pass
 
+    @play_auth
+    @route("DELETE /organizations/{org_id}/applications/{app_id}/destroyedInstances{ctype}")
+    def delete_destroyed_instances(self, org_id, app_id, cookies, data="{}", ctype=".json"): pass
+
     #Instance
     @play_auth
     @route("GET /organizations/{org_id}/dashboard{ctype}")
@@ -157,6 +168,10 @@ class PrivatePath(Router):
     @play_auth
     @route("PUT /organizations/{org_id}/instances/{instance_id}/configuration{ctype}")
     def put_instance_configuration(self, org_id, instance_id, data, cookies, ctype=".json"): pass
+
+    @play_auth
+    @route("GET /organizations/{org_id}/instances/{instance_id}/configuration{ctype}")
+    def get_instance_configuration(self, org_id, instance_id, cookies, ctype=".json"): pass
 
     @play_auth
     @route("PUT /organizations/{org_id}/instances/{instance_id}/rename{ctype}")
@@ -189,6 +204,14 @@ class PrivatePath(Router):
     @play_auth
     @route("POST /organizations/{org_id}/instances/{instance_id}/storedWorkflows/{workflow_id}/reschedule{ctype}")
     def post_instance_reschedule(self, org_id, instance_id, workflow_id, data, cookies, ctype=".json"): pass
+
+    @play_auth
+    @route("GET /organizations/{org_id}/runtime-components/{component_id}{ctype}")
+    def get_component_details(self, org_id, component_id, cookies, ctype=".json"): pass
+
+    @play_auth
+    @route("GET /organizations/{org_id}/runtime-components{ctype}")
+    def get_components(self, org_id, cookies, params=None, ctype=".json"): pass
 
     #Environment
     @play_auth
@@ -313,6 +336,15 @@ class PrivatePath(Router):
     @play_auth
     @route("POST /organizations/{org_id}/application-kits.json")
     def post_application_kits(self, org_id, data, cookies): pass
+
+    # yes it uses public api but this is only convenient way to call command and get json results
+    @basic_auth
+    @route("POST /api/1/services/{instance_id}/{command_name}")
+    def post_service_command(self, org_id, instance_id, command_name, auth, data="{}"):
+        """
+        :param org_id: not yet used but added for compatibility with future private api
+        """
+        pass
 
 
 class PublicPath(PrivatePath):

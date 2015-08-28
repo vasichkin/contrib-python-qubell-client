@@ -61,7 +61,7 @@ def route(route_str):  # decorator param
             destination_url = self.base_url + get_destination_url()
             f(*args, **kwargs)  # generally this is "pass"
 
-            bypass_args = {param: route_args[param] for param in ["data", "cookies", "auth", "files", "content_type", "params"] if param in route_args}
+            bypass_args = dict([(param, route_args[param]) for param in ["data", "cookies", "auth", "files", "content_type", "params"] if param in route_args])
 
             #add json content type for:
             # - all public api, meaning have basic auth
@@ -75,7 +75,7 @@ def route(route_str):  # decorator param
                 bypass_args['headers'] = {'Content-Type': 'application/x-yaml'}
 
             start = time.time()
-            response = requests.request(method, destination_url, verify=self.verify_ssl, **bypass_args)
+            response = self._session.request(method, destination_url, verify=self.verify_ssl, **bypass_args)
             end = time.time()
             elapsed = int((end - start) * 1000.0)
             ilog(elapsed)

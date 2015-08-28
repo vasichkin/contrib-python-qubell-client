@@ -140,9 +140,9 @@ class Environment(Entity, InstanceRouter):
 
     # Operations
 
-    def add_service(self, service):
+    def add_service(self, service, force=False):
         with self as env:
-            env.add_service(service)
+            env.add_service(service, force)
 
     def remove_service(self, service):
         with self as env:
@@ -240,9 +240,29 @@ class Environment(Entity, InstanceRouter):
             data['componentPolicies'].remove(policy[0])
             log.info("Removing policy %s from environment %s (%s)" % (matchers, env_name, self.id))
 
-        def add_service(service):
-            if service.instanceId not in data['serviceIds']:
-                data['serviceIds'].append(service.instanceId)
+        def add_service(service, force=False):
+            """
+            :param bool force: if instance from the same application exists, it will be replaced by new service.
+            """
+
+            # remove service of the same applicationId if already in env
+            if force:
+                app_id = service.applicationId
+                services_json = [s for s in data['services'] if 'applicationId' in s and s['applicationId'] == app_id]
+                if len(services_json) > 0 \
+                        and app_id == services_json[0]['applicationId'] \
+                        and service.id != services_json[0]['id']:
+                    from collections import namedtuple
+                    FakeInstance = namedtuple("Instance", "id")  # Fake type that can be passed to remove_service
+                    service_json = services_json[0]
+                    wrong_service = FakeInstance(id=service_json['id'])
+                    log.warn("'{}' service  from the same '{}' application found in environment and will be removed".
+                             format(service_json['name'], service_json['applicationName']))
+                    # noinspection PyTypeChecker
+                    remove_service(wrong_service)
+
+            if service.id not in data['serviceIds']:
+                data['serviceIds'].append(service.id)
                 data['services'].append(service.json())
                 log.info("Adding service id=%s to environment %s (%s)" %
                          (service.id, env_name, self.id))
@@ -257,7 +277,7 @@ class Environment(Entity, InstanceRouter):
                 set_policy({"action": "provisionVms", "parameter": "publicKeyId", "value": key})
 
         def remove_service(service):
-            data['serviceIds'].remove(service.instanceId)
+            data['serviceIds'].remove(service.id)
             data['services'] = [s for s in data['services'] if s['id'] != service.id]
             log.info("Removing service id=%s from environment %s (%s)" %
                      (service.id, env_name, self.id))
@@ -352,7 +372,7 @@ class Environment(Entity, InstanceRouter):
         self.__bulk_update(self.__bulk.operations)
 
     def get_backend_version(self):
-        versions = {x['name']: x['version'] for x in self.json()['backends']}
+        versions = dict([(x['name'], x['version']) for x in self.json()['backends']])
         if ZONE_NAME:
             return versions[ZONE_NAME]
         else:
@@ -410,7 +430,7 @@ class EnvironmentOperations(object):
     def remove_property(self, name):
         pass
 
-    def add_service(self, service):
+    def add_service(self, service, force=False):
         pass
 
     def remove_service(self, service):

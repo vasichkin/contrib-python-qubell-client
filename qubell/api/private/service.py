@@ -22,6 +22,7 @@ import yaml
 import simplejson as json
 
 from qubell.api.private import exceptions
+from qubell.api.tools import retry
 
 __all__ = ['COBALT_SECURE_STORE_TYPE', 'WORKFLOW_SERVICE_TYPE', 'SHARED_INSTANCE_CATALOG_TYPE',
            'STATIC_RESOURCE_POOL_TYPE', 'CLOUD_ACCOUNT_TYPE']
@@ -66,6 +67,16 @@ class ServiceMixin(object):
         payload = json.dumps({"revisionNameId": revision.nameId,
                               "instanceId": instance.instanceId})
         self._router.post_instance_shared(org_id=self.organizationId, env_id=instance.environment.id, data=payload)
+        @retry(5, 1, 2)
+        def wait_config_propagate():
+            return self.get_shared_instance_id(revision.nameId) == instance.instanceId
+        wait_config_propagate()
+
+    def get_shared_instance_id(self, revision):
+        payload = json.dumps({"arguments": {"revision": revision}, "includeIntermediate": False})
+        result = self._router.post_service_command(org_id=self.organizationId, instance_id=self.instanceId,
+                                                   command_name="strategy.get-shared-instance", data=payload)
+        return json.loads(result.content)[0].get("instance")
 
     def remove_shared_instance(self, instance):
         params = self.parameters

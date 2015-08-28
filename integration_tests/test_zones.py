@@ -19,29 +19,19 @@ __license__ = "Apache"
 __version__ = "1.0.1"
 __email__ = "vkhomenko@qubell.com"
 
-import os
-
 from base import BaseTestCase
-from qubell.api.private.manifest import Manifest
 
 
 class ZonesClassTest(BaseTestCase):
-
-    @classmethod
-    def setUpClass(cls):
-        super(ZonesClassTest, cls).setUpClass()
-        cls.org = cls.organization
-        cls.zone = cls.org.get_default_zone()
-
-    @classmethod
-    def tearDownClass(cls):
-        super(ZonesClassTest, cls).tearDownClass()
+    def setup_once(self):
+        super(ZonesClassTest, self).setup_once()
+        self.org = self.organization
+        self.zone = self.org.get_default_zone()
 
     def test_get_default_zone(self):
         zn = self.org.get_default_zone()
         self.assertTrue(zn in self.org.zones)
         self.assertEqual(self.org.zone.zoneId, zn.zoneId)
-
 
     def test_zones_sugar(self):
         org = self.org
@@ -69,7 +59,6 @@ class ZonesClassTest(BaseTestCase):
 
         self.assertTrue(self.org.delete_environment(my_env.id))
 
-
     def test_get_or_create_environment_method(self):
         org = self.org
         env = org.defaultEnvironment
@@ -86,7 +75,6 @@ class ZonesClassTest(BaseTestCase):
 
     def test_smart_environment_method(self):
         org = self.org
-        env = self.org.defaultEnvironment
         base_env = org.get_or_create_environment(name='Self-smart_environment_method')
 
         # Get environment
@@ -94,19 +82,11 @@ class ZonesClassTest(BaseTestCase):
         self.assertEqual(base_env, org.environment(id=base_env.id))
         self.assertEqual(base_env, org.environment(id=base_env.id, name='Self-smart_environment_method'))
 
-        """ TODO: check all variants
-        # Modify environment
-        new_name_env = org.environment(id=base_env.id, name='Self-smart_environment_method-new-name')
-        self.assertEqual(base_env, new_name_env)
-        self.assertEqual('Self-smart_environment_method-new-name', new_name_env.name)
-        """
-
         # Create environment
         new_environment = org.environment(name='Self-smart_environment_method-create')
         self.assertEqual('Self-smart_environment_method-create', new_environment.name)
         self.assertTrue(new_environment in org.environments)
         self.assertTrue(new_environment.delete())
-
 
         # Clean
         self.assertTrue(base_env.delete())

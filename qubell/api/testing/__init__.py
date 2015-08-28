@@ -1,20 +1,27 @@
 
 import logging as log
-
-from qubell.api.private.platform import QubellPlatform
-from qubell.api.private.testing import BaseTestCase as SandBoxTestCase, applications, environment, environments, instance, values, workflow
-from qubell.api.globals import QUBELL as qubell_config, PROVIDER as cloud_config
-from qubell.api.tools import retry
+import unittest
+import functools
 import nose.plugins.attrib
 import testtools
 
+
+from qubell.api.private.platform import QubellPlatform
+from qubell.api.private.testing import applications, environment, environments, instance, values, workflow
+from qubell.api.private.testing.sandbox_testcase import SandBoxTestCase
+from qubell.api.globals import QUBELL as qubell_config, PROVIDER as cloud_config
+from qubell.api.tools import retry, rand
+
+# noinspection PyBroadException
 try:
     from requests.packages import urllib3
     urllib3.disable_warnings()
 except:
     pass
-# Define what users import by *
-__all__ = ['BaseComponentTestCase', 'applications', 'environment', 'environments', 'instance', 'values', 'workflow', 'eventually', 'attr']
+
+__all__ = ['BaseComponentTestCase', 'applications', 'environment', 'environments', 'instance', 'values', 'workflow',
+           'eventually', 'attr', 'unique']
+
 
 class Qubell(object):
     """
@@ -34,6 +41,7 @@ class Qubell(object):
             log.info('Authentication succeeded.')
         return cls.__lazy_platform
 
+
 class BaseComponentTestCase(SandBoxTestCase):
     parameters = dict(qubell_config.items() + cloud_config.items())
     apps = []
@@ -44,10 +52,10 @@ class BaseComponentTestCase(SandBoxTestCase):
         base_env['applications'] = cls.apps or cls.applications
         return base_env
 
-    @classmethod
-    def setUpClass(cls):
-        cls.platform = Qubell.platform()
-        super(BaseComponentTestCase, cls).setUpClass()
+    def setup_once(self):
+        self.platform = Qubell.platform()
+        super(BaseComponentTestCase, self).setup_once()
+
 
 def eventually(*exceptions):
     """
@@ -58,12 +66,55 @@ def eventually(*exceptions):
     """
     return retry(tries=50, delay=0.5, backoff=1.1, retry_exception=exceptions)
 
+
 def attr(*args, **kwargs):
     """A decorator which applies the nose and testtools attr decorator
+    usage:
+    @attr("attribute1", "attribute2") - common usage
+    @attr(issue=7777) or @attr("fail") - When issue reported and waiting for fix.
+                                         Test will pass until it really fails.
+                                         Test will fail when issue fixed.
+    Most common: "smoke", "long", "unstable", "gui", "cloud"
     """
+    if 'skip' in args:
+        return unittest.skip("")
+
     def decorator(f):
-        f = testtools.testcase.attr(args)(f)
-        if not 'skip' in args:
-            return nose.plugins.attrib.attr(*args, **kwargs)(f)
-        # TODO: Should do something if test is skipped
+        if 'bug' in kwargs or 'issue' in kwargs or 'fail' in args or 'bug' in args:
+            bug_num = kwargs.get('bug') or kwargs.get('issue') or '0000'
+            return bug(bug_num)(f)
+
+        else:
+            tt_dec = testtools.testcase.attr(*args)(f)
+            nose_dec = nose.plugins.attrib.attr(*args, **kwargs)(tt_dec)
+            return nose_dec
+
     return decorator
+
+
+def bug(issue_id, text=''):
+    """
+    This is similar to unittest.expectedFailure decarator.
+    That allows to enter issue_id and custom message.
+    """
+
+    def catch(test_method):
+        @functools.wraps(test_method)
+        def inner(*args, **kwargs):
+            try:
+                test_method(*args, **kwargs)
+            except Exception:
+                raise nose.SkipTest('ISSUE: #{}'.format(issue_id))
+            else:
+                raise AssertionError('Failure expected. Is issue #{} fixed? {}'.format(issue_id, text))
+        return inner
+    return catch
+
+
+def unique(name):
+    """
+    Makes name unique. Used mainly if you do not want to pick old component, if exists.
+    :param name: name of components
+    :return: unique name
+    """
+    return '{0} - {1}'.format(name, rand())

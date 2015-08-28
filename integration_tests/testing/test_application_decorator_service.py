@@ -21,7 +21,9 @@ import os
 
 from qubell.api.testing import *
 from qubell.api.private import exceptions
-content = open((os.path.realpath(os.path.join(os.path.dirname(__file__), 'manifest.yml'))), 'r').read()
+
+content = open((os.path.realpath(os.path.join(os.path.dirname(__file__), 'manifest.yml')))).read()
+
 
 @environment({
     "default": {},
@@ -42,11 +44,12 @@ content = open((os.path.realpath(os.path.join(os.path.dirname(__file__), 'manife
      "content": content,
      "add_as_service": True},
     {"name": 'Envs AppTestCase-App',
-     "content": content,},
-    {"name":'EnvsServiceAppTestCaseAppNolaunch',
+     "content": content, },
+    {"name": 'EnvsServiceAppTestCaseAppNolaunch',
      "file": os.path.realpath(os.path.join(os.path.dirname(__file__), 'manifest.yml')),
      "launch": False}])
 class EnvsServiceAppTestCase(BaseComponentTestCase):
+    # noinspection PyShadowingNames
     @instance(byApplication='EnvsServiceAppTestCaseApp')
     @values({"app-output": "out"})
     def test_out(self, instance, out):
@@ -54,12 +57,12 @@ class EnvsServiceAppTestCase(BaseComponentTestCase):
         assert out == "This is default manifest"
         assert instance in self.organization.services
 
-        self.assertRaises(exceptions.NotFoundError, self.organization.get_instance, name='EnvsServiceAppTestCaseAppNolaunch')
+        self.assertRaises(exceptions.NotFoundError, self.organization.get_instance,
+                          name='EnvsServiceAppTestCaseAppNolaunch')
 
+    # noinspection PyShadowingNames
     @instance(byApplication='Envs AppTestCase-App')
     @values({"app-output": "out"})
     def test_out(self, instance, out):
         assert instance.running()
         assert out == "This is default manifest"
-
-

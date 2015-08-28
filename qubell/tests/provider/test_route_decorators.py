@@ -11,18 +11,19 @@ json_header = {'Content-Type': 'application/json'}
 
 
 def gen_response(code=200, resp_text="enjoy"):
-    class DummyResponse:
+    class DummyResponse(object):
         status_code = code
         text = resp_text
 
-        class request():
+        class request(object):
             body = "request body"
 
     return DummyResponse
 
 
-@patch("requests.request", create=True)
+@patch("requests.Session.request", create=True)
 class RouterDecoratorTests(unittest.TestCase):
+
     class DummyRouter(Router):
         @property
         def is_connected(self): return True
@@ -52,7 +53,8 @@ class RouterDecoratorTests(unittest.TestCase):
         @route("GET /simple.json")
         def get_simple_json(self, cookies): pass
 
-    router = DummyRouter("http://nowhere.com")
+    def setUp(self):
+        self.router = self.DummyRouter("http://nowhere.com")
 
     def test_simple_get(self, request_mock):
         request_mock.return_value = gen_response()
@@ -114,6 +116,7 @@ class RouterDecoratorTests(unittest.TestCase):
 
     def test_simple_json(self, request_mock):
         request_mock.return_value = gen_response()
+        self.router._cookies = 'Big Cake'
         self.router.get_simple_json()
         request_mock.assert_called_once_with('GET', 'http://nowhere.com/simple.json', headers=json_header,
                                              cookies="Big Cake", verify=False)
@@ -123,6 +126,7 @@ class RouterDecoratorTests(unittest.TestCase):
     def test_error_401(self, request_mock):
         request_mock.return_value = gen_response(401, "check credentials")
         with self.assertRaises(ApiUnauthorizedError) as context:
+            self.router._auth = 'ok'
             self.router.post_something_publicly()
         assert request_mock.called
         assert str(context.exception) == "Route POST /auth returned code=401 and error: check credentials"
@@ -130,6 +134,7 @@ class RouterDecoratorTests(unittest.TestCase):
     def test_error_403(self, request_mock):
         request_mock.return_value = gen_response(403, "ask admin for permissions")
         with self.assertRaises(ApiAuthenticationError) as context:
+            self.router._auth = 'ok'
             self.router.post_something_publicly()
         assert request_mock.called
         assert str(context.exception) == "Route POST /auth returned code=403 and error: ask admin for permissions"
@@ -137,6 +142,7 @@ class RouterDecoratorTests(unittest.TestCase):
     def test_error_404(self, request_mock):
         request_mock.return_value = gen_response(404, "not found or don't have permissions")
         with self.assertRaises(ApiNotFoundError) as context:
+            self.router._auth = 'ok'
             self.router.post_something_publicly()
         assert request_mock.called
         assert str(context.exception) == "Route POST /auth returned code=404 and error: not found or don't have permissions"
@@ -144,6 +150,7 @@ class RouterDecoratorTests(unittest.TestCase):
     def test_error_408(self, request_mock):
         request_mock.return_value = gen_response(408, "timeout")
         with self.assertRaises(ApiError) as context:
+            self.router._auth = 'ok'
             self.router.post_something_publicly()
         assert request_mock.called
         assert str(context.exception) == "Route POST /auth returned code=408 and error: timeout"
@@ -151,6 +158,7 @@ class RouterDecoratorTests(unittest.TestCase):
     def test_error_500(self, request_mock):
         request_mock.return_value = gen_response(500, "server down")
         with self.assertRaises(ApiError) as context:
+            self.router._auth = 'ok'
             self.router.post_something_publicly()
         assert request_mock.called
         assert str(context.exception) == "Route POST /auth returned code=500 and error: server down"
@@ -163,6 +171,7 @@ class RouterDecoratorTests(unittest.TestCase):
 
             ret_val = gen_response(404, "you hidded")
             request_mock.return_value = ret_val
+            self.router._auth = 'ok'
             assert self.router.post_something_publicly() == ret_val
             assert request_mock.called
 

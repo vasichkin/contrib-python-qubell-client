@@ -1,7 +1,11 @@
 import os
+
 from qubell.api.testing import *
+
+
 def manifest(name):
     return os.path.realpath(os.path.join(os.path.dirname(__file__), name))
+
 
 @environment({"default": {}})
 class RunAsServiceTest(BaseComponentTestCase):
@@ -13,6 +17,7 @@ class RunAsServiceTest(BaseComponentTestCase):
         {"name": service_name, "file": manifest("service.yml"), "add_as_service": True}
     ]
 
+    # noinspection PyUnusedLocal,PyShadowingNames
     @instance(byApplication=client_name)
     @values({"serv.stringValue": "value"})
     def test_client_connected(self, instance, value):

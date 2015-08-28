@@ -21,7 +21,9 @@ __license__ = "Apache"
 import os
 
 from qubell.api.testing import *
-content = open((os.path.realpath(os.path.join(os.path.dirname(__file__), 'manifest.yml'))), 'r').read()
+
+content = open((os.path.realpath(os.path.join(os.path.dirname(__file__), 'manifest.yml')))).read()
+
 
 @environment({
     "default": {},
@@ -38,14 +40,13 @@ content = open((os.path.realpath(os.path.join(os.path.dirname(__file__), 'manife
     }
 })
 @applications([{
-        "name": 'EnvsAppTest-Case App',
-        "file": os.path.realpath(os.path.join(os.path.dirname(__file__), 'manifest.yml'))
+    "name": 'EnvsAppTest-Case App',
+    "file": os.path.realpath(os.path.join(os.path.dirname(__file__), 'manifest.yml'))
 }])
 class EnvsAppTestCase(BaseComponentTestCase):
+    # noinspection PyShadowingNames
     @instance(byApplication='EnvsAppTest-Case App')
     @values({"app-output": "out"})
     def test_out(self, instance, out):
         assert instance.running()
         assert out == "This is default manifest"
-
-

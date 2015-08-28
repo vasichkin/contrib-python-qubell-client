@@ -19,25 +19,19 @@ __license__ = "Apache"
 __version__ = "1.0.1"
 __email__ = "vkhomenko@qubell.com"
 
-
 from base import BaseTestCase
-from qubell.api.private.instance import Instance
 
 
 class ServiceClassTest(BaseTestCase):
+    def setup_once(self):
+        super(ServiceClassTest, self).setup_once()
+        self.org = self.organization
+        self.env = self.org.create_environment(name='Self-ServiceClassTest-Env')
+        self.app = self.org.application(manifest=self.manifest, name='Self-ServiceClassTest')
 
-    @classmethod
-    def setUpClass(cls):
-        super(ServiceClassTest, cls).setUpClass()
-        cls.org = cls.organization
-        cls.env = cls.org.create_environment(name='Self-ServiceClassTest-Env')
-        cls.app = cls.org.application(manifest=cls.manifest, name='Self-ServiceClassTest')
-
-    @classmethod
-    def tearDownClass(cls):
-        cls.env.delete()
-        super(ServiceClassTest, cls).tearDownClass()
-
+    def teardown_once(self):
+        self.env.delete()
+        super(ServiceClassTest, self).teardown_once()
 
     def test_create_service_method(self):
         """ Check basic service creation works
@@ -73,7 +67,7 @@ class ServiceClassTest(BaseTestCase):
         self.assertTrue(serv.ready())
         self.assertTrue(serv in self.org.services)
         self.assertTrue(serv in self.org.instances)
-        self.assertFalse(serv.destroyAt) # Service has no destroy interval
+        self.assertFalse(serv.destroyAt)  # Service has no destroy interval
         self.assertTrue(serv in self.env.services)
 
         # clean
@@ -86,6 +80,7 @@ class ServiceClassTest(BaseTestCase):
         """ Check keystore service could be created
         """
         from qubell.api.private.service import COBALT_SECURE_STORE_TYPE
+
         serv = self.org.create_service(type=COBALT_SECURE_STORE_TYPE, environment=self.env)
         self.check_service(serv)
 
@@ -93,6 +88,7 @@ class ServiceClassTest(BaseTestCase):
         """ Check workflow service could be created
         """
         from qubell.api.private.service import WORKFLOW_SERVICE_TYPE
+
         serv = self.org.create_service(type=WORKFLOW_SERVICE_TYPE, environment=self.env)
         self.check_service(serv)
 
@@ -100,20 +96,25 @@ class ServiceClassTest(BaseTestCase):
         """ Check shared instance catalog service could be created
         """
         from qubell.api.private.service import SHARED_INSTANCE_CATALOG_TYPE
-        serv = self.org.create_service(type=SHARED_INSTANCE_CATALOG_TYPE, environment=self.env, parameters={'configuration.shared-instances':{}})
+
+        serv = self.org.create_service(type=SHARED_INSTANCE_CATALOG_TYPE, environment=self.env,
+                                       parameters={'configuration.shared-instances': {}})
         self.check_service(serv)
 
     def test_create_resource_pool_service(self):
         """ Check resource pool service could be created
         """
         from qubell.api.private.service import STATIC_RESOURCE_POOL_TYPE
-        serv = self.org.create_service(type=STATIC_RESOURCE_POOL_TYPE, environment=self.env, parameters={'configuration.resources':{}})
+
+        serv = self.org.create_service(type=STATIC_RESOURCE_POOL_TYPE, environment=self.env,
+                                       parameters={'configuration.resources': {}})
         self.check_service(serv)
 
     def test_create_cloud_account_service(self):
         """ Check cloud account service could be created
         """
         from qubell.api.private.service import CLOUD_ACCOUNT_TYPE
+
         provider_config = {'configuration.provider': 'aws-ec2',
                            'configuration.legacy-regions': 'us-east-1',
                            'configuration.endpoint-url': '',
