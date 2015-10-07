@@ -20,6 +20,8 @@ from qubell.api.private.platform import QubellPlatform
 from qubell.api.private.manifest import Manifest
 from qubell.api.private.testing.setup_once import SetupOnce
 from qubell.api.private.service import COBALT_SECURE_STORE_TYPE, WORKFLOW_SERVICE_TYPE, SHARED_INSTANCE_CATALOG_TYPE
+from qubell.api.private.service import system_application_types
+
 
 # this is required for used imports
 # noinspection PyUnresolvedReferences
@@ -52,7 +54,10 @@ class BaseTestCase(SetupOnce, unittest.TestCase):
     manifest = Manifest(file=os.path.join(os.path.dirname(__file__), './default.yml'), name='BaseTestManifest')
     platform = QubellPlatform.connect(user=parameters['user'], password=parameters['pass'], tenant=parameters['tenant'])
 
+
     def setup_once(self):
+        def type_to_app(t):
+            return self.organization.applications[system_application_types.get(t, t)]
     # Initialize organization
         if os.getenv("QUBELL_IT_LOCAL"):
             self.parameters['organization'] = self.__class__.__name__
@@ -70,7 +75,9 @@ class BaseTestCase(SetupOnce, unittest.TestCase):
             self.environment.set_backend(self.organization.zoneId)
         else:
             self.environment = self.organization.get_environment(name='default')
-        self.environment.clean()
-        self.shared_service = self.organization.service(name='BaseTestSharedService', type=SHARED_INSTANCE_CATALOG_TYPE, environment=self.environment, parameters={'configuration.shared-instances':{}})
-        self.wf_service = self.organization.service(name='Default workflow service', type=WORKFLOW_SERVICE_TYPE, environment=self.environment)
-        self.key_service = self.organization.service(name='Default credentials service', type=COBALT_SECURE_STORE_TYPE, environment=self.environment)
+
+        self.shared_service = self.organization.service(name='BaseTestSharedService',
+                                                        application=type_to_app(SHARED_INSTANCE_CATALOG_TYPE),
+                                                        environment=self.environment,
+                                                        parameters={'configuration.shared-instances': {}})
+        self.wf_service, self.key_service, self.cloud_account_service = self.environment.init_common_services()

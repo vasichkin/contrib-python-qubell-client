@@ -136,6 +136,7 @@ def _parameterize(source_case, cases):
                 # If ZONE_NAME set we should change env names to corresponding. So, new would be created in zone or cached by existing by name
                 # fixme: this attribute should endswith _name
                 updated_case.current_environment = env + ZoneConstants.zone_suffix()
+                updated_case.environments = format_as_api({updated_case.current_environment: cases[env]})
                 updated_case.source_name = case_name
                 yield updated_case
         else:
@@ -148,7 +149,7 @@ def parameterize(source_case, cases={}):
 def environment(params):
     def wraps_class(clazz):
         parameterize(source_case=clazz, cases=params)
-        clazz.environments = format_as_api(params)
+
         return clazz
     return wraps_class
 environments = environment

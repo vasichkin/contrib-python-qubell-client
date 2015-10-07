@@ -360,7 +360,6 @@ class Organization(Entity, InstanceRouter):
                               type=None, destroyInterval=None):
         try:
             instance = self.get_instance(id=id, name=name)
-            instance.environment.add_service(instance)
             return instance
         except exceptions.NotFoundError:
             return self.create_service(application, revision, environment, name, parameters, type)

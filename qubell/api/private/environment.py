@@ -341,8 +341,8 @@ class Environment(Entity, InstanceRouter):
                                                 environment=self)
         if not with_cloud_account:
             with self as env:
-                env.add_service(wf_service)
-                env.add_service(key_service)
+                env.add_service(wf_service, force=True)
+                env.add_service(key_service, force=True)
             return wf_service, key_service
 
         cloud_account_service = self.organization.service(name=zone_names.DEFAULT_CLOUD_ACCOUNT_SERVICE,
@@ -350,9 +350,9 @@ class Environment(Entity, InstanceRouter):
                                                           environment=self,
                                                           parameters=PROVIDER_CONFIG)
         with self as env:
-            env.add_service(wf_service)
-            env.add_service(key_service)
-            env.add_service(cloud_account_service)
+            env.add_service(wf_service, force=True)
+            env.add_service(key_service, force=True)
+            env.add_service(cloud_account_service, force=True)
         return wf_service, key_service, cloud_account_service
 
     # noinspection PyMethodMayBeStatic
