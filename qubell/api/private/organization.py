@@ -557,12 +557,15 @@ class Organization(Entity, InstanceRouter):
             ca_data = dict(accessKey=access_key, secretKey=secret_key)
             self._router.post_init_custom_cloud_account(org_id=self.organizationId, data=json.dumps(ca_data))
 
-    def set_applications_from_meta(self, metadata):
+    def set_applications_from_meta(self, metadata, exclude=None):
         """
         Parses meta and update or create each application
-        :type metadata: str
-        :param metadata: path or url to meta.yml
+        :param str metadata: path or url to meta.yml
+        :param list[str] exclude: List of application names, to exclude from meta.
+                                  This might be need when you use meta as list of dependencies
         """
+        if not exclude:
+            exclude = []
         if metadata.startswith('http'):
             meta = yaml.safe_load(requests.get(url=metadata).content)
         else:
@@ -571,9 +574,10 @@ class Organization(Entity, InstanceRouter):
 
         applications = []
         for app in meta['kit']['applications']:
-            applications.append({
-                'name': app['name'],
-                'url': app['manifest']})
+            if app['name'] not in exclude:
+                applications.append({
+                    'name': app['name'],
+                    'url': app['manifest']})
         self.restore({'applications': applications})
 
     def upload_applications(self, metadata, category=None):

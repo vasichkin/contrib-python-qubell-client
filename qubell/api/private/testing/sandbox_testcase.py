@@ -68,7 +68,7 @@ class SandBoxTestCase(SetupOnce, unittest.TestCase):
             "services": servs,
             "instances": insts,
             "environments": envs,
-            "applications": cls.applications}
+            "applications": cls.apps or cls.applications}
 
     @classmethod
     def timeout(cls):
@@ -113,7 +113,8 @@ class SandBoxTestCase(SetupOnce, unittest.TestCase):
         else:
             # If 'meta' in sandbox, restore applications that comes in meta before.
             if hasattr(self, 'meta'):
-                self.upload_metadata_applications(self.meta)
+                apps_under_test = [app['name'] for app in self.sandbox.sandbox['applications']]
+                self.organization.set_applications_from_meta(self.meta, exclude=apps_under_test)
 
             services_to_start = [x for x in self.sandbox['applications'] if x.get('add_as_service', False)]
             instances_to_start = [x for x in self.sandbox['applications'] if x.get('launch', True) and not x.get('add_as_service', False)]
@@ -145,9 +146,6 @@ class SandBoxTestCase(SetupOnce, unittest.TestCase):
         super(SandBoxTestCase, self).setUp()
         if self.setup_skip:
             self.skipTest(self.setup_skip)
-
-    def upload_metadata_applications(self, metadata):
-        self.organization.set_applications_from_meta(metadata)
 
     def launch_instance(cls, appdata):
         application = cls.organization.applications[appdata['name']]

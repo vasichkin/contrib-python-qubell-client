@@ -44,13 +44,6 @@ class Qubell(object):
 
 class BaseComponentTestCase(SandBoxTestCase):
     parameters = dict(qubell_config.items() + cloud_config.items())
-    apps = []
-
-    @classmethod
-    def environment(cls, organization):
-        base_env = super(BaseComponentTestCase, cls).environment(organization)
-        base_env['applications'] = cls.apps or cls.applications
-        return base_env
 
     def setup_once(self):
         self.platform = Qubell.platform()
