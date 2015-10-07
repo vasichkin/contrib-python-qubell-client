@@ -41,7 +41,9 @@ content = open((os.path.realpath(os.path.join(os.path.dirname(__file__), 'manife
 })
 @applications([{
     "name": 'EnvsAppTest-Case App',
-    "file": os.path.realpath(os.path.join(os.path.dirname(__file__), 'manifest.yml'))
+    "file": os.path.realpath(os.path.join(os.path.dirname(__file__), 'manifest.yml')),
+    "parameters": {"in.app_input": 'bla-bla-bla'},
+    "settings": {"destroyInterval": '300000'}
 }])
 class EnvsAppTestCase(BaseComponentTestCase):
     # noinspection PyShadowingNames
@@ -49,4 +51,4 @@ class EnvsAppTestCase(BaseComponentTestCase):
     @values({"app-output": "out"})
     def test_out(self, instance, out):
         assert instance.running()
-        assert out == "This is default manifest"
+        assert out == "bla-bla-bla"

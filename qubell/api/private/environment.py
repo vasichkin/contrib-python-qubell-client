@@ -339,6 +339,8 @@ class Environment(Entity, InstanceRouter):
         key_service = self.organization.service(name=zone_names.DEFAULT_CREDENTIAL_SERVICE,
                                                 application=type_to_app(COBALT_SECURE_STORE_TYPE),
                                                 environment=self)
+        assert wf_service.running()
+        assert key_service.running()
         if not with_cloud_account:
             with self as env:
                 env.add_service(wf_service, force=True)
@@ -349,6 +351,7 @@ class Environment(Entity, InstanceRouter):
                                                           application=type_to_app(CLOUD_ACCOUNT_TYPE),
                                                           environment=self,
                                                           parameters=PROVIDER_CONFIG)
+        assert cloud_account_service.running()
         with self as env:
             env.add_service(wf_service, force=True)
             env.add_service(key_service, force=True)

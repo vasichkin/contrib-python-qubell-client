@@ -30,6 +30,7 @@ class SandBoxTestCase(SetupOnce, unittest.TestCase):
     sandbox = None
     environments = None
     applications = []
+    apps = []  # fixme: moved up for backward compatibility
     instances = []
     current_environment = DEFAULT_ENV_NAME()
 
