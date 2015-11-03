@@ -6,10 +6,11 @@ import click
 from colorama import Fore, Style
 import yaml
 
-from qubell.api.globals import QUBELL as qubell_config
+from qubell.api.globals import QUBELL as qubell_config, PROVIDER as provider_config
 from qubell.api.private.platform import QubellPlatform
 from qubell.api.private.exceptions import NotFoundError
 from qubell.api.private.manifest import Manifest
+from qubell.api.private.service import system_application_types, CLOUD_ACCOUNT_TYPE
 from qubell.cli.yamlutils import DuplicateAnchorLoader
 
 _platform = None
@@ -152,6 +153,43 @@ def create_org(organization):
         except AssertionError:
             org = _platform.get_organization(organization)
             click.echo(_color("YELLOW", org.id) + " still initializing")
+
+@cli.command()
+@click.option("--type", default="", help="Provider name (for example, aws-ec2, openstack, etc)")
+@click.option("--identity", default="", help="Provider identity or login, PROVIDER_IDENTITY by default")
+@click.option("--credential", default="", help="Provider credential or secrete key or password, PROVIDER_CREDENTIAL by default")
+@click.option("--region", default="", help="Provider region (for example, us-east-1), PROVIDER_REGION by default")
+@click.option("--security-group", default="default", help="Default security group, \"default\" if not set")
+@click.option("--environment", default="default", help="Account environment")
+@click.argument("account_name")
+def init_ca(account_name, environment, **kwargs):
+    global _platform
+    for (k, v) in kwargs.iteritems():
+        if v:
+            provider_config["provider_" + k] = v
+    PROVIDER_CONFIG = {
+        'configuration.provider': provider_config['provider_type'],
+        'configuration.legacy-regions': provider_config['provider_region'],
+        'configuration.endpoint-url': '',
+        'configuration.legacy-security-group': '',
+        'configuration.identity': provider_config['provider_identity'],
+        'configuration.credential': provider_config['provider_credential']
+    }
+    click.echo(account_name + " ", nl=False)
+    org = _platform.get_organization(qubell_config["organization"])
+    type_to_app = lambda t: org.applications[system_application_types.get(t, t)]
+    env = org.get_environment(environment)
+    try:
+        cloud_account_service = org.service(
+            name=account_name,
+            application=type_to_app(CLOUD_ACCOUNT_TYPE),
+            environment=env,
+            parameters=PROVIDER_CONFIG)
+        click.echo(_color("GREEN", cloud_account_service.id))
+    except IOError:
+        click.echo(_color("RED", "FAILED"))
+
+
 
 
 if __name__ == '__main__':
