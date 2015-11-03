@@ -1,3 +1,4 @@
+import logging as log
 from os.path import join, basename
 import re
 
@@ -19,8 +20,12 @@ _platform = None
 @click.option("--user", default="", help="User to use, QUBELL_USER by default")
 @click.option("--password", default="", help="Password to use, QUBELL_PASSWORD by default")
 @click.option("--organization", default="", help="Organization to use, QUBELL_ORGANIZATION by default")
-def cli(**kwargs):
+@click.option("--debug/--no-debug", default=False, help="Debug mode.")
+def cli(debug, **kwargs):
     global _platform
+    if debug:
+        log.basicConfig(level=log.DEBUG)
+        log.getLogger("requests.packages.urllib3.connectionpool").setLevel(log.DEBUG)
     for (k, v) in kwargs.iteritems():
         if v:
             qubell_config[k] = v
