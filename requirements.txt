@@ -4,3 +4,5 @@ pyaml
 testtools
 nose
 requests
+click
+colorama
