@@ -9,6 +9,7 @@ from qubell.api.globals import QUBELL as qubell_config
 from qubell.api.private.platform import QubellPlatform
 from qubell.api.private.exceptions import NotFoundError
 from qubell.api.private.manifest import Manifest
+from qubell.cli.yamlutils import DuplicateAnchorLoader
 
 _platform = None
 
@@ -86,7 +87,7 @@ def export_app(recursive, application, output_dir):
             _save_manifest(app, manifest)
             click.echo(_color("GREEN", " OK"))
             if recursive:
-                app_names = _child_applications(yaml.load(manifest["manifest"]))
+                app_names = _child_applications(yaml.load(manifest["manifest"], DuplicateAnchorLoader))
                 for app_name in app_names:
                     do_export(app_name)
         except IOError:
