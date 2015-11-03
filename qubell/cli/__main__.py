@@ -46,8 +46,9 @@ def _color(color, text):
 @cli.command()
 @click.option("--recursive/--non-recursive", default=False, help="Export also dependencies.")
 @click.option("--output-dir", default="", help="Output directory for manifest files, current by default.")
+@click.option("--version", default=None, help="Manifest version to export.")
 @click.argument("application")
-def export_app(recursive, application, output_dir):
+def export_app(recursive, application, output_dir, version):
     global _platform
 
     def _save_manifest(app, manifest, filename=None):
@@ -78,11 +79,14 @@ def export_app(recursive, application, output_dir):
 
     org = _platform.get_organization(qubell_config["organization"])
 
-    def do_export(application):
+    def do_export(application, version=None):
         click.echo("Saving " + _color("BLUE", application) + " ", nl=False)
         try:
             app = org.get_application(application)
-            manifest = app.get_manifest_latest()
+            if not version:
+                manifest = app.get_manifest_latest()
+            else:
+                manifest = app.get_manifest(version)
             click.echo(_color("BLUE", "v" + str(manifest["version"])) + " ", nl=False)
             _save_manifest(app, manifest)
             click.echo(_color("GREEN", " OK"))
@@ -90,10 +94,10 @@ def export_app(recursive, application, output_dir):
                 app_names = _child_applications(yaml.load(manifest["manifest"], DuplicateAnchorLoader))
                 for app_name in app_names:
                     do_export(app_name)
-        except IOError:
+        except (IOError, NotFoundError):
             click.echo(_color("RED", " FAIL"))
 
-    do_export(application)
+    do_export(application, version)
 
 
 @cli.command()
