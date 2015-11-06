@@ -176,8 +176,11 @@ class Application(Entity, InstanceRouter):
 
 # MANIFEST
 
-    def get_manifest(self):
-        return self._router.post_application_refresh(org_id=self.organizationId, app_id=self.applicationId).json()
+    def get_manifest(self, version):
+        if not version:
+            return self._router.post_application_refresh(org_id=self.organizationId, app_id=self.applicationId).json()
+        else:
+            return self._router.get_application_manifest_version(org_id=self.organizationId, app_id=self.applicationId, version=version).json()
 
     def get_manifest_latest(self):
         return self._router.get_application_manifests_latest(org_id=self.organizationId, app_id=self.applicationId).json()
