@@ -36,7 +36,7 @@ def cli(debug, **kwargs):
         password=qubell_config["password"])
 
 
-@cli.command()
+@cli.command(name="list-apps")
 def list_apps():
     global _platform
 
@@ -49,7 +49,7 @@ def _color(color, text):
     return getattr(Fore, color) + str(text) + Style.RESET_ALL
 
 
-@cli.command()
+@cli.command(name="export-app")
 @click.option("--recursive/--non-recursive", default=False, help="Export also dependencies.")
 @click.option("--output-dir", default="", help="Output directory for manifest files, current by default.")
 @click.option("--version", default=None, help="Manifest version to export.")
@@ -106,7 +106,7 @@ def export_app(recursive, application, output_dir, version):
     do_export(application, version)
 
 
-@cli.command()
+@cli.command(name="import-app")
 @click.argument("filenames", nargs=-1)
 def import_app(filenames):
     global _platform
@@ -136,7 +136,7 @@ def import_app(filenames):
             break
 
 
-@cli.command()
+@cli.command(name="create-org")
 @click.argument("organization")
 def create_org(organization):
     global _platform
@@ -154,7 +154,7 @@ def create_org(organization):
             org = _platform.get_organization(organization)
             click.echo(_color("YELLOW", org.id) + " still initializing")
 
-@cli.command()
+@cli.command(name="init-ca")
 @click.option("--type", default="", help="Provider name (for example, aws-ec2, openstack, etc)")
 @click.option("--identity", default="", help="Provider identity or login, PROVIDER_IDENTITY by default")
 @click.option("--credential", default="", help="Provider credential or secrete key or password, PROVIDER_CREDENTIAL by default")
