@@ -53,24 +53,24 @@ initializing cloud accounts, and importing/exporting applications.
       --help               Show this message and exit.
     
     Commands:
-      create_org
-      export_app
-      import_app
-      list_apps
-      init_ca
+      create-org
+      export-app
+      import-app
+      list-apps
+      init-ca
       
 Exporting also can handle dependent submodules, allowing you to download all 
 manifest dependencies:
 
-    $ python -mqubell.cli --organization 'ATGTestCase' export_app --output-dir ATG --recursive ATG-Starter-Kit
+    $ python -mqubell.cli --organization 'ATGTestCase' export-app --output-dir ATG --recursive ATG-Starter-Kit
     Saving ATG-Starter-Kit v22 => ATG/ATG-Starter-Kit-v22.yml OK
     Saving Database v7 => ATG/Database-v7.yml OK
     Saving Application Server v4 => ATG/Application Server-v4.yml OK
     $
-    $ python -mqubell.cli create_org TestExport
+    $ python -mqubell.cli create-org TestExport
     TestExport 563c65b2e4b0d565ed1a63ca
     $
-    $ python -mqubell.cli --organization TestExport import_app ATG/*
+    $ python -mqubell.cli --organization TestExport import-app ATG/*
     Importing ATG/ATG-Starter-Kit-v22.yml => ATG-Starter-Kit 563c65e0e4b081eaa2289fce OK
     Importing ATG/Application Server-v4.yml => Application Server 563c65e1e4b081eaa2289fd1 OK
     Importing ATG/Database-v7.yml => Database 563c65e3e4b081eaa2289fd4 OK
