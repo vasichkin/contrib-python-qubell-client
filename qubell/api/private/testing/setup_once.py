@@ -69,7 +69,7 @@ class SetupOnce(object):
                     cls.__self.__wrapped_tearDown()
             finally:
                 cls.__self = None  # release pointer
-        super(SetupOnce, cls).setUpClass()
+        super(SetupOnce, cls).tearDownClass()
 
     def setup_once(self):
         """
