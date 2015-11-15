@@ -3,6 +3,7 @@ import os
 from os.path import join, basename
 import re
 import sys
+import time
 import itertools
 
 import click
@@ -34,6 +35,16 @@ STATUS_COLORS = {
     "EXECUTING": "BLUE",
     "FAILED": "RED",
     "DESTROYED": "LIGHTBLACK_EX",
+}
+
+SEVERITIES = ['ERROR', 'WARNING', 'INFO', 'DEBUG', 'TRACE']
+
+SEVERITY_COLORS = {
+    "ERROR": "RED",
+    "WARNING": "YELLOW",
+    "INFO": "BLACK",
+    "DEBUG": "LIGHTBLACK_EX",
+    "TRACE": "LIGHTBLACK_EX"
 }
 
 
@@ -299,6 +310,91 @@ def list_instances(application, status):
         click.echo(inst.id + " " +
                    _color("BLUE", inst.name) + " " +
                    _color(STATUS_COLORS.get(inst.status.upper(), "BLACK"), inst.status.upper()))
+
+def _pad(string, length):
+    return ("%-" + str(length) + "s") % string
+
+@cli.command("show-instance-logs")
+@click.option("--severity", default="INFO", help="Logs severity.")
+@click.option("--localtime/--utctime", default=True, help="Use local or UTC time.")
+@click.option("--sort-by", default="time",
+              help="Sort by time/severity/source/eventTypeText/description. Prefix with minus for inverted order.")
+@click.option("--hide-multiline/--multiline", default=True, help="Show only first line of multi-line message")
+@click.option("--filter-text", default=None, help="Filter by full text, including source and event name")
+@click.option("--max-items", default=30,
+              help="Limit number of items to show. Positive integer for tail, negative integer for head.")
+@click.option("--follow/--no-follow", default=False, help="Wait for new messages to appear.")
+@click.option("--show-all/--no-show-all", default=False, help="Show all messages, overrides --max-items.")
+@click.argument("instance")
+def show_logs(instance, localtime, severity, sort_by, hide_multiline, filter_text, max_items, show_all, follow):
+    global _platform
+    org = _platform.get_organization(QUBELL["organization"])
+    inst = org.get_instance(instance)
+    accepted_severities = list(itertools.takewhile(lambda x: x != severity, SEVERITIES)) + [severity]
+
+    def show_activitylog(after=None):
+        activitylog = inst.get_activitylog(severity=accepted_severities, after=after)
+
+        if not activitylog or not len(activitylog):
+            return
+        time_f = localtime and time.localtime or time.gmtime
+        max_severity_length = max(map(lambda i: len(i['severity']), activitylog.log))
+        max_source_length = max(map(lambda i: len(i.get('source', "self")), activitylog.log))
+        max_type_length = max(map(lambda i: len(i['eventTypeText']), activitylog.log))
+        if sort_by[0] == "-":
+            reverse = True
+            sort_by_key = sort_by[1:]
+        else:
+            reverse = False
+            sort_by_key = sort_by
+        if filter_text:
+            activitylog.log = filter(lambda s: filter_text in str(s), activitylog.log)
+        activitylog.log = sorted(activitylog.log, key=lambda i: i[sort_by_key], reverse=reverse)
+        if not show_all and max_items:
+            if max_items > 0:
+                activitylog.log = activitylog.log[-max_items:]
+            else:
+                activitylog.log = activitylog.log[:-max_items]
+        vertical_padding_before = False
+        for item in activitylog:
+            multiline = "\n" in item['description']
+            if multiline and not vertical_padding_before and not hide_multiline:
+                click.echo()
+            padding = len(time.strftime("%Y-%m-%d %H:%M:%S", time_f(item['time'] / 1000))) + \
+                      max_severity_length + max_source_length + max_type_length + 8
+            click.echo(
+                "%s  %s  %s  %s  " % (
+                    time.strftime("%Y-%m-%d %H:%M:%S", time_f(item['time'] / 1000)),
+                    _color(SEVERITY_COLORS.get(item['severity'], "BLACK"), _pad(item['severity'], max_severity_length)),
+                    _pad(item.get('source', "") or (item.get("self") and "self") or " ", max_source_length),
+                    _pad(item['eventTypeText'], max_type_length)),
+                nl=False)
+            if not multiline:
+                click.echo(item['description'])
+                vertical_padding_before = False
+            else:
+                lines = item['description'].split("\n")
+                click.echo(lines[0])
+                if not hide_multiline:
+                    for line in lines[1:]:
+                        click.echo(padding * " " + line)
+                    click.echo()
+                    vertical_padding_before = True
+        return activitylog
+
+    after = None
+    while True:
+        last_log = show_activitylog(after=after)
+        if last_log and len(last_log):
+            after = max(map(lambda i: i['time'], last_log.log))
+            after += 1  # add extra millisecond to avoid showning same line twice
+        elif not after:
+            after = int(time.time()) * 1000
+            after += 1
+        if follow:
+            time.sleep(10)
+        else:
+            break
 
 
 if __name__ == '__main__':
