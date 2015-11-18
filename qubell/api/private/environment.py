@@ -116,7 +116,8 @@ class Environment(Entity, InstanceRouter):
 
     def set_as_default(self):
         data = json.dumps({'environmentId': self.id})
-        return self._router.put_organization_default_environment(org_id=self.organizationId, data=data).json()
+        return self._router.put_organization_default_environment(env_id=self.id, org_id=self.organizationId,
+                                                                 data=data).json()
 
     def list_available_services_json(self):
         return self._router.get_environment_available_services(org_id=self.organizationId,

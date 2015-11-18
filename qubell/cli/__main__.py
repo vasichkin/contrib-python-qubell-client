@@ -268,7 +268,11 @@ def list_envs():
     org = _platform.get_organization(QUBELL["organization"])
     for env in org.environments:
         status = env.isOnline and _color("GREEN", "ONLINE") or _color("RED", "FAILED")
-        click.echo(env.id + " " + _color("BLUE", env.name) + " " + status)
+        click.echo(env.id + " " + _color("BLUE", env.name) + " " + status, nl=False)
+        if env.isDefault:
+            click.echo(" " + _color("BLUE", "DEFAULT"))
+        else:
+            click.echo()
 
 
 @cli.command("list-instances")
@@ -395,6 +399,87 @@ def show_logs(instance, localtime, severity, sort_by, hide_multiline, filter_tex
             time.sleep(10)
         else:
             break
+
+
+@cli.command("clear-env")
+@click.option("--destroy-services/--keep-services", default=False, help="Destroy services")
+@click.option("--fallback-force/--no-fallback-force", default=False, help="Use force-remove if destroy failed")
+@click.option("--force/--no-force", default=False, help="Use force-remove instead of destroy")
+@click.argument("environment")
+def clear_env(environment, destroy_services, force, fallback_force):
+    global _platform
+    org = _platform.get_organization(QUBELL["organization"])
+    env = org.get_environment(environment)
+    if destroy_services:
+        for service in env.services:
+            click.echo(service.id + " " + _color("BLUE", service.name) + " ", nl=False)
+            env.remove_service(service)
+            if not force:
+                try:
+                    service.destroy()
+                    service.destroyed()
+                except AssertionError:
+                    if fallback_force:
+                        service.force_remove()
+            else:
+                service.force_remove()
+            click.echo(_color(STATUS_COLORS["DESTROYED"], "DESTROYED"))
+    click.echo(env.id + " " + _color("BLUE", env.name) + " ", nl=False)
+    env.clean()
+    click.echo(_color("GREEN", "CLEANED"))
+
+
+@cli.command("init-env")
+@click.option("--zone", default=None, help="In what zone services should be launched")
+@click.option("--with-cloud-account/--without-cloud-account", default=True, help="Whether init-ca should be performed")
+@click.argument("environment")
+def init_env(environment, with_cloud_account, zone):
+    global _platform
+    org = _platform.get_organization(QUBELL["organization"])
+    env = org.get_environment(environment)
+    click.echo(env.id + " " + _color("BLUE", env.name) + " ", nl=False)
+    env.init_common_services(with_cloud_account=with_cloud_account, zone_name=zone)
+    click.echo(_color("GREEN", "OK"))
+
+
+@cli.command("create-env")
+@click.option("--default/--no-default", default=False, help="Make created environment default")
+@click.option("--zone", default=None, help="Zone for environment. When performing init-env, services will be launched in that zone")
+@click.option("--init/--no-init", default=False, help="Perform init-env after creation")
+@click.option("--with-cloud-account/--without-cloud-account", default=True,
+              help="If performing init-env, whether init-ca should be performed")
+@click.argument("name")
+@click.pass_context
+def create_env(ctx, name, init, zone, default, with_cloud_account):
+    global _platform
+    org = _platform.get_organization(QUBELL["organization"])
+    env = org.create_environment(name, default, zone)
+    click.echo(env.id + " " + _color("BLUE", env.name) + " ", nl=False)
+    if init:
+        env.init_common_services(with_cloud_account=with_cloud_account, zone_name=zone)
+    click.echo(_color("GREEN", "CREATED"))
+
+
+@cli.command("delete-env")
+@click.argument("environment")
+def delete_env(environment):
+    global _platform
+    org = _platform.get_organization(QUBELL["organization"])
+    env = org.get_environment(environment)
+    click.echo(env.id + " " + _color("BLUE", env.name) + " ", nl=False)
+    env.delete()
+    click.echo(_color("GREEN", "DELETED"))
+
+
+@cli.command("make-default")
+@click.argument("environment")
+def make_default(environment):
+    global _platform
+    org = _platform.get_organization(QUBELL["organization"])
+    env = org.get_environment(environment)
+    click.echo(env.id + " " + _color("BLUE", env.name) + " ", nl=False)
+    env.set_as_default()
+    click.echo(_color("GREEN", "DEFAULT"))
 
 
 if __name__ == '__main__':
