@@ -97,7 +97,9 @@ def list_apps():
 
 
 def _color(color, text):
-    return getattr(Fore, color) + str(text) + Style.RESET_ALL
+    if not isinstance(text, basestring):
+        text = str(text)
+    return getattr(Fore, color) + text + Style.RESET_ALL
 
 
 @cli.command(name="export-app")
