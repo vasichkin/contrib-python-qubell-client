@@ -11,10 +11,10 @@ from colorama import Fore, Style
 import yaml
 
 from qubell.api.globals import QUBELL, PROVIDER
-from qubell.api.tools import load_env
+from qubell.api.tools import load_env, waitForStatus
 from qubell.api.private.instance import InstanceList
 from qubell.api.private.platform import QubellPlatform
-from qubell.api.private.exceptions import NotFoundError
+from qubell.api.private.exceptions import NotFoundError, ApiError
 from qubell.api.private.manifest import Manifest
 from qubell.api.private.service import system_application_types, CLOUD_ACCOUNT_TYPE
 from qubell.cli.yamlutils import DuplicateAnchorLoader
@@ -34,6 +34,7 @@ STATUS_COLORS = {
     "DESTROYING": "BLUE",
     "EXECUTING": "BLUE",
     "FAILED": "RED",
+    "ERROR": "RED",
     "DESTROYED": "LIGHTBLACK_EX",
 }
 
@@ -47,6 +48,27 @@ SEVERITY_COLORS = {
     "TRACE": "LIGHTBLACK_EX"
 }
 
+
+def _color_status(status):
+    return _color(STATUS_COLORS.get(status.upper(), "BLACK"), status)
+
+
+def fmt_time(t):
+    return time.strftime("%Y-%m-%d %H:%M:%S", t)
+
+
+def _columns(iterable, key, value):
+    key_length = max(map(lambda o: len(str(key(o))), iterable) + [0])
+    for item in iterable:
+        key_string = str(key(item))
+        value_string = str(value(item))
+        click.echo(key_string + (key_length - len(key_string)) * " " + "  " + value_string)
+
+def _map_opt(value_or_none, function):
+    if value_or_none is None:
+        return None
+    else:
+        return function(value_or_none)
 
 @click.group()
 @click.option("--tenant", default="", help="Tenant url to use, QUBELL_TENANT by default")
@@ -313,12 +335,135 @@ def list_instances(application, status):
     for inst in instance_candidates:
         if not any(map(lambda p: p(inst.status), filters)):
             continue
-        click.echo(inst.id + " " +
-                   _color("BLUE", inst.name) + " " +
-                   _color(STATUS_COLORS.get(inst.status.upper(), "BLACK"), inst.status.upper()))
+        _describe_instance_short(inst)
+
+
+def _describe_instance_short(inst):
+    click.echo(inst.id + " " +
+               _color("BLUE", inst.name) + " " +
+               _color(STATUS_COLORS.get(inst.status.upper(), "BLACK"), inst.status.upper()))
+
+
+@cli.command("describe-instance")
+@click.argument("instance")
+def describe_instance(instance, localtime=True):
+    global _platform
+    org = _platform.get_organization(QUBELL["organization"])
+    inst = org.get_instance(instance)
+    _describe_instance(inst, localtime)
+
+
+def _calc_title(items, template="%s (%s)"):
+    for value in items:
+        if value['id'] != value['name']:
+            value['_title'] = template % (value['id'], value['name'])
+        else:
+            value['_title'] = value['id']
+
+
+def _describe_instance(inst, localtime=None):
+    click.echo("Instance    %s  %s  %s" % (inst.id, _color("BLUE", inst.name), _color_status(inst.status)))
+    app = inst.application
+    click.echo("Application %s  %s" % (app.id, _color("BLUE", app.name)))
+    env = inst.environment
+    click.echo("Environment " + env.id + "  " + _color("BLUE", env.name))
+    time_f = localtime and time.localtime or time.gmtime
+    click.echo("Launched    " + fmt_time(time_f(inst.createdAt / 1000)))
+    if inst.destroyAt:
+        click.echo("Destroy     " + fmt_time(time_f(inst.destroyAt / 1000)))
+    else:
+        click.echo("Destroy     " + "not scheduled")
+    pad = "    "
+    if inst.config:
+        click.echo("Config: ")
+        _calc_title(inst.config)
+        _columns(inst.config, lambda o: pad + o['_title'], lambda o: pad + o['value'])
+    if inst.endpoints:
+        click.echo("Return values: ")
+        _calc_title(inst.endpoints)
+        _columns(inst.endpoints, lambda o: pad + o['_title'], lambda o: o['value'])
+    if inst.workflowsInfo.get('availableWorkflows', []):
+        click.echo("Workflows: ")
+        for workflow in inst.workflowsInfo.get('availableWorkflows', []):
+            if workflow['parameters']:
+                args = "(" + ", ".join(map(lambda param: "%(type)s %(id)s" % param, workflow['parameters'])) + ")"
+            else:
+                args = ""
+            click.echo(pad + "%s%s" % (workflow['name'], args))
+    if inst.serviceIn:
+        click.echo("Service in:")
+        _columns(inst.serviceIn, lambda o: pad + o['id'], lambda o: _color("BLUE", o['name']))
+
+
+@cli.command("launch-instance")
+@click.option("--revision", default=None, help="Revision to launch")
+@click.option("--environment", default=None, help="Environment used to launch instance")
+@click.option("--destroy", default=None, help="Schedule destroy (seconds)")
+@click.option("--parameter", default=False, type=(unicode, unicode), multiple=True, help="Parameter value")
+@click.argument("application")
+@click.argument("name", default=None, required=False)
+def launch_instance(revision, environment, destroy, application, name, parameter):
+    print parameter
+    global _platform
+    org = _platform.get_organization(QUBELL["organization"])
+    app = org.get_application(application)
+    destroy_interval = _map_opt(destroy, lambda x: x / 1000)
+    env = _map_opt(environment, org.get_environment)
+    parameters = dict(parameter)
+    inst = org.create_instance(application=app, revision=revision, environment=env,
+                               name=name, parameters=parameters, destroyInterval=destroy_interval)
+    _describe_instance(inst, True)
+
+
+@cli.command("destroy-instance")
+@click.option("--wait/--no-wait", default=False, help="Wait for DESTROYED status")
+@click.option("--timeout", default=3, type=int, help="Timeout in minutes")
+@click.argument("instance")
+def destroy_instance(instance, timeout, wait):
+    global _platform
+    org = _platform.get_organization(QUBELL["organization"])
+    inst = org.get_instance(instance)
+    inst.destroy()
+    _describe_instance_short(inst)
+    if wait:
+        inst.destroyed(timeout)
+        _describe_instance_short(inst)
+
+
+@cli.command("wait-status")
+@click.option("--timeout", default=3, type=int, help="Timeout in minutes")
+@click.option("--status", default="Active", help="Status to wait (Requested, Launching, Active, Executing, Destroying, Destroyed, Unknown)")
+@click.argument("instance")
+def wait_status(instance, status, timeout):
+    global _platform
+    org = _platform.get_organization(QUBELL["organization"])
+    inst = org.get_instance(instance)
+    timeout = int(timeout)
+    # TODO case-insensitive
+    accepted_states = ['Destroying', 'Active', 'Running', 'Executing', 'Unknown']
+    try:
+        waitForStatus(instance=inst, final=status, accepted=accepted_states, timeout=[timeout * 20, 3, 1])
+    finally:
+        _describe_instance_short(org.get_instance(instance))
+
+
+@cli.command("remove-instance")
+@click.option("--force/--no-force", default=False, help="Wait for DESTROYED status")
+@click.argument("instance")
+def destroy_instance(instance, force):
+    global _platform
+    org = _platform.get_organization(QUBELL["organization"])
+    inst = org.get_instance(instance)
+    if not force:
+        # TODO
+        raise NotImplementedError("non-force removal is not supported yet")
+    else:
+        inst.force_remove()
+
 
 def _pad(string, length):
     return ("%-" + str(length) + "s") % string
+
 
 @cli.command("show-instance-logs")
 @click.option("--severity", default="INFO", help="Logs severity.")
