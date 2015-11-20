@@ -618,6 +618,36 @@ def delete_env(environment):
     click.echo(_color("GREEN", "DELETED"))
 
 
+@cli.command("clone-env")
+@click.option("--wait/--no-wait", default=False, help="Wait for environment to become ONLINE")
+@click.option("--zone", default=None, help="Zone for environment")
+@click.argument("environment")
+@click.argument("name", default=None, required=False)
+def clone_env(environment, name, wait, zone):
+    global _platform
+    org = _platform.get_organization(QUBELL["organization"])
+    orig_env = org.get_environment(environment)
+    if not name:
+        name = orig_env.name + " clone"
+    env = org.create_environment(name, False, zone or orig_env.zoneId)
+    click.echo(env.id + " " + _color("BLUE", env.name) + " ", nl=False)
+    env.restore(orig_env.json())
+    if wait:
+        env.ready()
+        click.echo(_color("GREEN", "ONLINE"))
+    else:
+        click.echo(_color("GREEN", "CREATED"))
+
+
+@cli.command("list-zones")
+def list_zones():
+    global _platform
+    org = _platform.get_organization(QUBELL["organization"])
+    _columns(org.list_zones_json(),
+             lambda o: o['id'],
+             lambda o: _color("BLUE", o['name']) + (o['isDefault'] and " DEFAULT" or ""))
+
+
 @cli.command("make-default")
 @click.argument("environment")
 def make_default(environment):
