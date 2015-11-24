@@ -30,6 +30,9 @@ setup(name='qubell-api-python-client',
       install_requires=install_requires,
       tests_require=test_requires,
       test_suite="nosetests",
-      entry_points={
-        'console_scripts': 'qubell_monitor = qubell.monitor.monitor:main'},
+      entry_points='''
+        [console_scripts]
+        nomi=qubell.cli.__main__:cli
+        qubell_monitor = qubell.monitor.monitor:main
+    '''
      )
