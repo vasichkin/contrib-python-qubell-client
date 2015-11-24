@@ -639,6 +639,34 @@ def clone_env(environment, name, wait, zone):
         click.echo(_color("GREEN", "CREATED"))
 
 
+@cli.command("describe-env")
+@click.argument("environment")
+def describe_env(environment):
+    global _platform
+    org = _platform.get_organization(QUBELL["organization"])
+    env = org.get_environment(environment)
+    click.echo("Environment " + env.id + "  " + _color("BLUE", env.name))
+    click.echo("Status      " + (env.isOnline and _color("GREEN", "ONLINE") or _color("RED", "OFFLINE")))
+    click.echo("Backend     " + env.zoneId + "  " + _color("BLUE", org.zones[env.zoneId].name))
+    if env.services:
+        click.echo("Services")
+        def service_text(s):
+            try:
+                env_text = s.json()['environment']['name']
+            except Exception:
+                env_text = ""
+            return _color("BLUE", s.name) + " @ " + env_text
+        _columns(env.services, lambda s: "    " + s.id, service_text)
+    if env.policies:
+        click.echo("Policies")
+        _columns(env.policies, lambda s: "    %(action)s.%(parameter)s" % s, lambda s: s['value'])
+    if env.markers:
+        click.echo("Markers")
+        _columns(env.markers, lambda s: "    %(name)s" % s, lambda s: "")
+    if env.properties:
+        click.echo("Properties")
+        _columns(env.properties, lambda s: "    %(type)s %(name)s" % s, lambda s: s['value'])
+
 @cli.command("list-zones")
 def list_zones():
     global _platform
