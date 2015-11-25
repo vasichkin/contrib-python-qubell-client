@@ -67,6 +67,10 @@ class PrivatePath(Router):
     @route("GET /404")
     def get_404(self): pass
 
+    @play_auth
+    @route("POST /validate{ctype}")
+    def post_validate(self, data, cookies, ctype=".json", content_type="yaml"): pass
+
     #Organization
     @play_auth
     @route("POST /organizations{ctype}")

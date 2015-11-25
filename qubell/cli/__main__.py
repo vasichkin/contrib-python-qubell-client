@@ -687,5 +687,32 @@ def make_default(environment):
     click.echo(_color("GREEN", "DEFAULT"))
 
 
+def _print_message(message, color="BLACK"):
+    if "message" in message:
+        click.echo(_color(color, message["message"]))
+    elif isinstance(message, basestring):
+        click.echo(_color(color, message))
+    else:
+        click.echo(_color(color, "<error format not supported by this version of cli>"))
+
+@cli.command("validate-manifest")
+@click.argument("filename", required=False, default=None)
+def validate_manifest(filename):
+    global _platform
+    if filename:
+        manifest = Manifest(file=filename)
+    else:
+        manifest = Manifest(content=sys.stdin.read())
+    result = _platform.validate(manifest)
+    errors = result.get("errors", [])
+    warnings = result.get("warnings", [])
+    for error in errors:
+        _print_message(error, "RED")
+    for warning in result.get("warnings", []):
+        _print_message(warning, "YELLOW")
+    if not errors and not warnings:
+        click.echo(_color("GREEN", "NO WARNINGS"))
+    exit(errors and 1 or 0)
+
 if __name__ == '__main__':
     cli()
