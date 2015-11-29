@@ -702,6 +702,35 @@ def describe_env(environment):
         _columns(env.properties, lambda s: "    %(type)s %(name)s" % s, lambda s: s['value'])
 
 
+@cli.command("export-env")
+@click.argument("environment")
+@click.argument("filename", default=None, required=False)
+def export_env(environment, filename):
+    platform = _get_platform()
+    org = platform.get_organization(QUBELL["organization"])
+    env = org.get_environment(environment)
+    if filename:
+        click.echo("Exporting %s to %s " % (_color("BLUE", env.name), filename), nl=False)
+        f = open(filename, "w")
+        click.echo(_color("GREEN", "OK"), err=True)
+    else:
+        f = sys.stdout
+    f.write(env.export_yaml())
+
+
+@cli.command("import-env")
+@click.option("--merge/--no-merge", default=True, help="Merge or replace file contents with existing environment.")
+@click.argument("environment")
+@click.argument("filename")
+def import_env(environment, filename, merge):
+    platform = _get_platform()
+    org = platform.get_organization(QUBELL["organization"])
+    env = org.get_environment(environment)
+    click.echo("Importing %s to %s " % (filename, _color("BLUE", env.name),), nl=False)
+    env.import_yaml(filename, merge=merge)
+    click.echo(_color("GREEN", "OK"))
+
+
 @cli.command("list-zones")
 def list_zones():
     platform = _get_platform()

@@ -248,6 +248,10 @@ class PrivatePath(Router):
     @route("POST /organizations/{org_id}/environments/{env_id}/import{ctype}")
     def post_env_import(self, org_id, env_id, cookies, data="{}", files="{}", ctype=".json"): pass
 
+    @play_auth
+    @route("GET /organizations/{org_id}/environments/{env_id}/export")
+    def get_env_export(self, org_id, env_id, cookies): pass
+
     #Zone
     @play_auth
     @route("GET /organizations/{org_id}/zones{ctype}")

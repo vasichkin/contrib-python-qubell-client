@@ -195,6 +195,9 @@ class Environment(Entity, InstanceRouter):
         files = {'path': ("filename", open(file))}
         self._router.post_env_import(org_id=self.organizationId, env_id=self.environmentId, data=data, files=files)
 
+    def export_yaml(self):
+        return self._router.get_env_export(org_id=self.organizationId, env_id=self.environmentId).text
+
     def __bulk_update(self, env_operations):
 
         data = self.json()
