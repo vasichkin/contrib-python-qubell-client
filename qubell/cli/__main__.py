@@ -250,7 +250,8 @@ def create_org(organization):
 @cli.command(name="init-ca")
 @click.option("--type", default="", help="Provider name (for example, aws-ec2, openstack, etc)")
 @click.option("--identity", default="", help="Provider identity or login, PROVIDER_IDENTITY by default")
-@click.option("--credential", default="", help="Provider credential or secrete key or password, PROVIDER_CREDENTIAL by default")
+@click.option("--credential", default="",
+              help="Provider credential or secrete key or password, PROVIDER_CREDENTIAL by default")
 @click.option("--region", default="", help="Provider region (for example, us-east-1), PROVIDER_REGION by default")
 @click.option("--security-group", default="default", help="Default security group, \"default\" if not set")
 @click.option("--environment", default="default", help="Account environment")
@@ -264,7 +265,9 @@ def init_ca(account_name, environment, **kwargs):
             PROVIDER["provider_" + k] = v
     click.echo(account_name + " ", nl=False)
     org = platform.get_organization(QUBELL["organization"])
-    type_to_app = lambda t: org.applications[system_application_types.get(t, t)]
+
+    def type_to_app(t):
+        return org.applications[system_application_types.get(t, t)]
     env = org.get_environment(environment)
     try:
         cloud_account_service = org.service(
@@ -320,8 +323,8 @@ def list_envs():
 
 @cli.command("list-instances")
 @click.option("--status", default="!DESTROYED",
-              help="Filter by statuses, one of " \
-                   "REQUESTED, LAUNCHING, ACTIVE, EXECUTING, FAILED, DESTROYING, DESTROYED." \
+              help="Filter by statuses, one of "
+                   "REQUESTED, LAUNCHING, ACTIVE, EXECUTING, FAILED, DESTROYING, DESTROYED."
                    "Several statuses can be listed using comma. !STATUS_NAME to invert match.")
 @click.argument("application", default=None, required=False)
 def list_instances(application, status):
@@ -339,12 +342,14 @@ def list_instances(application, status):
             filters.append(match(status_filter))
     if application:
         application = org.get_application(application)
-    def list_instances():
+
+    def list_instances_json():
         return org.list_instances_json(application=application)
+
     def list_destroyed_instances():
         return org.list_instances_json(application=application, show_only_destroyed=True)
     instance_candidates = \
-        InstanceList(list_json_method=list_instances,
+        InstanceList(list_json_method=list_instances_json,
                      organization=org).init_router(platform._router)
     if "DESTROYED" in status.upper() or "!" in status:
         destroyed_candidates = \
@@ -451,7 +456,8 @@ def destroy_instance(instance, timeout, wait):
 
 @cli.command("wait-status")
 @click.option("--timeout", default=3, type=int, help="Timeout in minutes")
-@click.option("--status", default="Active", help="Status to wait (Requested, Launching, Active, Executing, Destroying, Destroyed, Unknown)")
+@click.option("--status", default="Active",
+              help="Status to wait (Requested, Launching, Active, Executing, Destroying, Destroyed, Unknown)")
 @click.argument("instance")
 def wait_status(instance, status, timeout):
     platform = _get_platform()
@@ -531,7 +537,7 @@ def show_logs(instance, localtime, severity, sort_by, hide_multiline, filter_tex
             if multiline and not vertical_padding_before and not hide_multiline:
                 click.echo()
             padding = len(time.strftime("%Y-%m-%d %H:%M:%S", time_f(item['time'] / 1000))) + \
-                      max_severity_length + max_source_length + max_type_length + 8
+                max_severity_length + max_source_length + max_type_length + 8
             click.echo(
                 "%s  %s  %s  %s  " % (
                     time.strftime("%Y-%m-%d %H:%M:%S", time_f(item['time'] / 1000)),
@@ -610,7 +616,8 @@ def init_env(environment, with_cloud_account, zone):
 
 @cli.command("create-env")
 @click.option("--default/--no-default", default=False, help="Make created environment default")
-@click.option("--zone", default=None, help="Zone for environment. When performing init-env, services will be launched in that zone")
+@click.option("--zone", default=None, help="Zone for environment. "
+                                           "When performing init-env, services will be launched in that zone")
 @click.option("--init/--no-init", default=False, help="Perform init-env after creation")
 @click.option("--with-cloud-account/--without-cloud-account", default=True,
               help="If performing init-env, whether init-ca should be performed")
@@ -669,6 +676,7 @@ def describe_env(environment):
     click.echo("Backend     " + env.zoneId + "  " + _color("BLUE", org.zones[env.zoneId].name))
     if env.services:
         click.echo("Services")
+
         def service_text(s):
             try:
                 env_text = s.json()['environment']['name']
@@ -685,6 +693,7 @@ def describe_env(environment):
     if env.properties:
         click.echo("Properties")
         _columns(env.properties, lambda s: "    %(type)s %(name)s" % s, lambda s: s['value'])
+
 
 @cli.command("list-zones")
 def list_zones():
@@ -713,6 +722,7 @@ def _print_message(message, color="BLACK"):
         click.echo(_color(color, message))
     else:
         click.echo(_color(color, "<error format not supported by this version of cli>"))
+
 
 @cli.command("validate-manifest")
 @click.argument("filename", required=False, default=None)
