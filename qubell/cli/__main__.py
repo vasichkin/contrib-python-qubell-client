@@ -206,10 +206,14 @@ def export_app(recursive, application, output_dir, version):
 
 
 @cli.command(name="import-app")
+@click.option("--category", default=None, help="Category in which applications will be created")
+@click.option("--overwrite/--no-overwrite", default=False, help="Upload manifest for already existing applications")
 @click.argument("filenames", nargs=-1)
-def import_app(filenames):
+def import_app(filenames, category, overwrite):
     platform = _get_platform()
     org = platform.get_organization(QUBELL["organization"])
+    if category:
+        category = org.categories[category]
     regex = re.compile(r"^(.*?)(-v(\d+)|)\.[^.]+$")
     for filename in filenames:
         click.echo("Importing " + filename, nl=False)
@@ -219,15 +223,18 @@ def import_app(filenames):
             break
         app_name = regex.match(basename(filename)).group(1)
         click.echo(" => " + _color("BLUE", app_name) + " ", nl=False)
-        try:
-            app = org.get_application(app_name)
-            click.echo(app.id + _color("RED", " FAIL") + " already exists")
-            break
-        except NotFoundError:
-            pass
+        if not overwrite:
+            try:
+                app = org.get_application(app_name)
+                click.echo(app.id + _color("RED", " FAIL") + " already exists")
+                break
+            except NotFoundError:
+                pass
         try:
             with file(filename, "r") as f:
                 app = org.application(name=app_name, manifest=Manifest(content=f.read()))
+            if category:
+                app.update(category=category.id)
             click.echo(app.id + _color("GREEN", " OK"))
         except IOError as e:
             click.echo(_color("RED", " FAIL") + " " + e.message)
