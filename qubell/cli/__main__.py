@@ -78,6 +78,13 @@ def _map_opt(value_or_none, function):
 @click.option("--organization", default="", help="Organization to use, QUBELL_ORGANIZATION by default")
 @click.option("--debug/--no-debug", default=False, help="Debug mode, also QUBELL_LOG_LEVEL can be used.")
 def cli(debug, **kwargs):
+    """
+    CLI for tonomi.com using contrib-python-qubell-client
+
+    To enable completion:
+
+      eval "$(_NOMI_COMPLETE=source nomi)"
+    """
     global PROVIDER_CONFIG
 
     if debug:
