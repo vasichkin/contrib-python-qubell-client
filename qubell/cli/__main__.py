@@ -20,7 +20,6 @@ from qubell.api.private.service import system_application_types, CLOUD_ACCOUNT_T
 from qubell.cli.yamlutils import DuplicateAnchorLoader
 
 
-_platform = None
 PROVIDER_CONFIG = None
 
 
@@ -64,11 +63,13 @@ def _columns(iterable, key, value):
         value_string = str(value(item))
         click.echo(key_string + (key_length - len(key_string)) * " " + "  " + value_string)
 
+
 def _map_opt(value_or_none, function):
     if value_or_none is None:
         return None
     else:
         return function(value_or_none)
+
 
 @click.group()
 @click.option("--tenant", default="", help="Tenant url to use, QUBELL_TENANT by default")
@@ -77,7 +78,7 @@ def _map_opt(value_or_none, function):
 @click.option("--organization", default="", help="Organization to use, QUBELL_ORGANIZATION by default")
 @click.option("--debug/--no-debug", default=False, help="Debug mode, also QUBELL_LOG_LEVEL can be used.")
 def cli(debug, **kwargs):
-    global _platform, PROVIDER_CONFIG
+    global PROVIDER_CONFIG
 
     if debug:
         log.basicConfig(level=log.DEBUG)
@@ -93,15 +94,31 @@ def cli(debug, **kwargs):
         'configuration.identity': PROVIDER['provider_identity'],
         'configuration.credential': PROVIDER['provider_credential']
     }
-    _platform = QubellPlatform.connect(
-        tenant=QUBELL["tenant"],
-        user=QUBELL["user"],
-        password=QUBELL["password"])
+
+    class UserContext(object):
+
+        def __init__(self):
+            self.platform = None
+
+        def get_platform(self):
+            if not self.platform:
+                self.platform = QubellPlatform.connect(
+                    tenant=QUBELL["tenant"],
+                    user=QUBELL["user"],
+                    password=QUBELL["password"])
+            return self.platform
+
+    ctx = click.get_current_context()
+    ctx.obj = UserContext()
+
+
+def _get_platform():
+    return click.get_current_context().obj.get_platform()
 
 
 @cli.command(name="list-apps")
 def list_apps():
-    global _platform
+    _platform = _get_platform()
 
     org = _platform.get_organization(QUBELL["organization"])
     for app in org.applications:
@@ -130,7 +147,7 @@ def _color(color, text):
 @click.option("--version", default=None, help="Manifest version to export.")
 @click.argument("application")
 def export_app(recursive, application, output_dir, version):
-    global _platform
+    platform = _get_platform()
 
     def _save_manifest(app, manifest, filename=None):
         filename = filename or "%s-v%s.yml" % (app.name, manifest["version"])
@@ -158,7 +175,7 @@ def export_app(recursive, application, output_dir, version):
         else:
             return []
 
-    org = _platform.get_organization(QUBELL["organization"])
+    org = platform.get_organization(QUBELL["organization"])
 
     def do_export(current_app, current_version=None):
         click.echo("Saving " + _color("BLUE", current_app) + " ", nl=False)
@@ -184,7 +201,7 @@ def export_app(recursive, application, output_dir, version):
 @cli.command(name="import-app")
 @click.argument("filenames", nargs=-1)
 def import_app(filenames):
-    global _platform
+    platform = _get_platform()
 
     regex = re.compile(r"^(.*?)(-v(\d+)|)\.[^.]+$")
     for filename in filenames:
@@ -195,7 +212,7 @@ def import_app(filenames):
             break
         app_name = regex.match(basename(filename)).group(1)
         click.echo(" => " + _color("BLUE", app_name) + " ", nl=False)
-        org = _platform.get_organization(QUBELL["organization"])
+        org = platform.get_organization(QUBELL["organization"])
         try:
             app = org.get_application(app_name)
             click.echo(app.id + _color("RED", " FAIL") + " already exists")
@@ -214,19 +231,19 @@ def import_app(filenames):
 @cli.command(name="create-org")
 @click.argument("organization")
 def create_org(organization):
-    global _platform
+    platform = _get_platform()
 
     click.echo(organization + " ", nl=False)
     try:
-        org = _platform.get_organization(organization)
+        org = platform.get_organization(organization)
         click.echo(_color("YELLOW", org.id) + " already exists")
         return 1
     except NotFoundError:
         try:
-            org = _platform.create_organization(organization)
+            org = platform.create_organization(organization)
             click.echo(_color("GREEN", org.id))
         except AssertionError:
-            org = _platform.get_organization(organization)
+            org = platform.get_organization(organization)
             click.echo(_color("YELLOW", org.id) + " still initializing")
 
 
@@ -239,13 +256,14 @@ def create_org(organization):
 @click.option("--environment", default="default", help="Account environment")
 @click.argument("account_name")
 def init_ca(account_name, environment, **kwargs):
-    global _platform, PROVIDER_CONFIG
+    platform = _get_platform()
+    global PROVIDER_CONFIG
 
     for (k, v) in kwargs.iteritems():
         if v:
             PROVIDER["provider_" + k] = v
     click.echo(account_name + " ", nl=False)
-    org = _platform.get_organization(QUBELL["organization"])
+    org = platform.get_organization(QUBELL["organization"])
     type_to_app = lambda t: org.applications[system_application_types.get(t, t)]
     env = org.get_environment(environment)
     try:
@@ -262,7 +280,8 @@ def init_ca(account_name, environment, **kwargs):
 @cli.command(name="restore-env")
 @click.argument("environment")
 def restore_env(environment):
-    global _platform, PROVIDER_CONFIG
+    platform = _get_platform()
+    global PROVIDER_CONFIG
 
     cfg = load_env(environment)
     # Patch configuration to include provider and org info
@@ -272,7 +291,7 @@ def restore_env(environment):
 
     click.echo("Restoring env: " + _color("BLUE", environment) + " ", nl=False)
     try:
-        _platform.restore(cfg)
+        platform.restore(cfg)
         click.echo(_color("GREEN", "OK"))
     except Exception as e:
         click.echo(_color("RED", "FAIL"))
@@ -281,15 +300,15 @@ def restore_env(environment):
 
 @cli.command("list-orgs")
 def list_orgs():
-    global _platform
-    for app in _platform.organizations:
+    platform = _get_platform()
+    for app in platform.organizations:
         click.echo(app.id + " " + _color("BLUE", app.name))
 
 
 @cli.command("list-envs")
 def list_envs():
-    global _platform
-    org = _platform.get_organization(QUBELL["organization"])
+    platform = _get_platform()
+    org = platform.get_organization(QUBELL["organization"])
     for env in org.environments:
         status = env.isOnline and _color("GREEN", "ONLINE") or _color("RED", "FAILED")
         click.echo(env.id + " " + _color("BLUE", env.name) + " " + status, nl=False)
@@ -306,8 +325,8 @@ def list_envs():
                    "Several statuses can be listed using comma. !STATUS_NAME to invert match.")
 @click.argument("application", default=None, required=False)
 def list_instances(application, status):
-    global _platform
-    org = _platform.get_organization(QUBELL["organization"])
+    platform = _get_platform()
+    org = platform.get_organization(QUBELL["organization"])
     filters = []
     for status_filter in status.split(","):
         if not status_filter:
@@ -326,11 +345,11 @@ def list_instances(application, status):
         return org.list_instances_json(application=application, show_only_destroyed=True)
     instance_candidates = \
         InstanceList(list_json_method=list_instances,
-                     organization=org).init_router(_platform._router)
+                     organization=org).init_router(platform._router)
     if "DESTROYED" in status.upper() or "!" in status:
         destroyed_candidates = \
             InstanceList(list_json_method=list_destroyed_instances,
-                         organization=org).init_router(_platform._router)
+                         organization=org).init_router(platform._router)
         instance_candidates = itertools.chain(instance_candidates, destroyed_candidates)
     for inst in instance_candidates:
         if not any(map(lambda p: p(inst.status), filters)):
@@ -347,8 +366,8 @@ def _describe_instance_short(inst):
 @cli.command("describe-instance")
 @click.argument("instance")
 def describe_instance(instance, localtime=True):
-    global _platform
-    org = _platform.get_organization(QUBELL["organization"])
+    platform = _get_platform()
+    org = platform.get_organization(QUBELL["organization"])
     inst = org.get_instance(instance)
     _describe_instance(inst, localtime)
 
@@ -404,8 +423,8 @@ def _describe_instance(inst, localtime=None):
 @click.argument("name", default=None, required=False)
 def launch_instance(revision, environment, destroy, application, name, parameter):
     print parameter
-    global _platform
-    org = _platform.get_organization(QUBELL["organization"])
+    platform = _get_platform()
+    org = platform.get_organization(QUBELL["organization"])
     app = org.get_application(application)
     destroy_interval = _map_opt(destroy, lambda x: x / 1000)
     env = _map_opt(environment, org.get_environment)
@@ -420,8 +439,8 @@ def launch_instance(revision, environment, destroy, application, name, parameter
 @click.option("--timeout", default=3, type=int, help="Timeout in minutes")
 @click.argument("instance")
 def destroy_instance(instance, timeout, wait):
-    global _platform
-    org = _platform.get_organization(QUBELL["organization"])
+    platform = _get_platform()
+    org = platform.get_organization(QUBELL["organization"])
     inst = org.get_instance(instance)
     inst.destroy()
     _describe_instance_short(inst)
@@ -435,8 +454,8 @@ def destroy_instance(instance, timeout, wait):
 @click.option("--status", default="Active", help="Status to wait (Requested, Launching, Active, Executing, Destroying, Destroyed, Unknown)")
 @click.argument("instance")
 def wait_status(instance, status, timeout):
-    global _platform
-    org = _platform.get_organization(QUBELL["organization"])
+    platform = _get_platform()
+    org = platform.get_organization(QUBELL["organization"])
     inst = org.get_instance(instance)
     timeout = int(timeout)
     # TODO case-insensitive
@@ -451,8 +470,8 @@ def wait_status(instance, status, timeout):
 @click.option("--force/--no-force", default=False, help="Wait for DESTROYED status")
 @click.argument("instance")
 def destroy_instance(instance, force):
-    global _platform
-    org = _platform.get_organization(QUBELL["organization"])
+    platform = _get_platform()
+    org = platform.get_organization(QUBELL["organization"])
     inst = org.get_instance(instance)
     if not force:
         # TODO
@@ -478,8 +497,8 @@ def _pad(string, length):
 @click.option("--show-all/--no-show-all", default=False, help="Show all messages, overrides --max-items.")
 @click.argument("instance")
 def show_logs(instance, localtime, severity, sort_by, hide_multiline, filter_text, max_items, show_all, follow):
-    global _platform
-    org = _platform.get_organization(QUBELL["organization"])
+    platform = _get_platform()
+    org = platform.get_organization(QUBELL["organization"])
     inst = org.get_instance(instance)
     accepted_severities = list(itertools.takewhile(lambda x: x != severity, SEVERITIES)) + [severity]
 
@@ -554,8 +573,8 @@ def show_logs(instance, localtime, severity, sort_by, hide_multiline, filter_tex
 @click.option("--force/--no-force", default=False, help="Use force-remove instead of destroy")
 @click.argument("environment")
 def clear_env(environment, destroy_services, force, fallback_force):
-    global _platform
-    org = _platform.get_organization(QUBELL["organization"])
+    platform = _get_platform()
+    org = platform.get_organization(QUBELL["organization"])
     env = org.get_environment(environment)
     if destroy_services:
         for service in env.services:
@@ -581,8 +600,8 @@ def clear_env(environment, destroy_services, force, fallback_force):
 @click.option("--with-cloud-account/--without-cloud-account", default=True, help="Whether init-ca should be performed")
 @click.argument("environment")
 def init_env(environment, with_cloud_account, zone):
-    global _platform
-    org = _platform.get_organization(QUBELL["organization"])
+    platform = _get_platform()
+    org = platform.get_organization(QUBELL["organization"])
     env = org.get_environment(environment)
     click.echo(env.id + " " + _color("BLUE", env.name) + " ", nl=False)
     env.init_common_services(with_cloud_account=with_cloud_account, zone_name=zone)
@@ -598,8 +617,8 @@ def init_env(environment, with_cloud_account, zone):
 @click.argument("name")
 @click.pass_context
 def create_env(ctx, name, init, zone, default, with_cloud_account):
-    global _platform
-    org = _platform.get_organization(QUBELL["organization"])
+    platform = _get_platform()
+    org = platform.get_organization(QUBELL["organization"])
     env = org.create_environment(name, default, zone)
     click.echo(env.id + " " + _color("BLUE", env.name) + " ", nl=False)
     if init:
@@ -610,8 +629,8 @@ def create_env(ctx, name, init, zone, default, with_cloud_account):
 @cli.command("delete-env")
 @click.argument("environment")
 def delete_env(environment):
-    global _platform
-    org = _platform.get_organization(QUBELL["organization"])
+    platform = _get_platform()
+    org = platform.get_organization(QUBELL["organization"])
     env = org.get_environment(environment)
     click.echo(env.id + " " + _color("BLUE", env.name) + " ", nl=False)
     env.delete()
@@ -624,8 +643,8 @@ def delete_env(environment):
 @click.argument("environment")
 @click.argument("name", default=None, required=False)
 def clone_env(environment, name, wait, zone):
-    global _platform
-    org = _platform.get_organization(QUBELL["organization"])
+    platform = _get_platform()
+    org = platform.get_organization(QUBELL["organization"])
     orig_env = org.get_environment(environment)
     if not name:
         name = orig_env.name + " clone"
@@ -642,8 +661,8 @@ def clone_env(environment, name, wait, zone):
 @cli.command("describe-env")
 @click.argument("environment")
 def describe_env(environment):
-    global _platform
-    org = _platform.get_organization(QUBELL["organization"])
+    platform = _get_platform()
+    org = platform.get_organization(QUBELL["organization"])
     env = org.get_environment(environment)
     click.echo("Environment " + env.id + "  " + _color("BLUE", env.name))
     click.echo("Status      " + (env.isOnline and _color("GREEN", "ONLINE") or _color("RED", "OFFLINE")))
@@ -669,8 +688,8 @@ def describe_env(environment):
 
 @cli.command("list-zones")
 def list_zones():
-    global _platform
-    org = _platform.get_organization(QUBELL["organization"])
+    platform = _get_platform()
+    org = platform.get_organization(QUBELL["organization"])
     _columns(org.list_zones_json(),
              lambda o: o['id'],
              lambda o: _color("BLUE", o['name']) + (o['isDefault'] and " DEFAULT" or ""))
@@ -679,8 +698,8 @@ def list_zones():
 @cli.command("make-default")
 @click.argument("environment")
 def make_default(environment):
-    global _platform
-    org = _platform.get_organization(QUBELL["organization"])
+    platform = _get_platform()
+    org = platform.get_organization(QUBELL["organization"])
     env = org.get_environment(environment)
     click.echo(env.id + " " + _color("BLUE", env.name) + " ", nl=False)
     env.set_as_default()
@@ -698,12 +717,12 @@ def _print_message(message, color="BLACK"):
 @cli.command("validate-manifest")
 @click.argument("filename", required=False, default=None)
 def validate_manifest(filename):
-    global _platform
+    platform = _get_platform()
     if filename:
         manifest = Manifest(file=filename)
     else:
         manifest = Manifest(content=sys.stdin.read())
-    result = _platform.validate(manifest)
+    result = platform.validate(manifest)
     errors = result.get("errors", [])
     warnings = result.get("warnings", [])
     for error in errors:
