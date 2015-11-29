@@ -234,6 +234,17 @@ def import_app(filenames):
             break
 
 
+@cli.command(name="delete-app")
+@click.argument("application", nargs=-1)
+def delete_app(application):
+    platform = _get_platform()
+    org = platform.get_organization(QUBELL["organization"])
+    for app in application:
+        click.echo("Deleting %s" % (_color("BLUE", app)), nl=False)
+        org.delete_application(app)
+        click.echo(_color("GREEN", " OK"))
+
+
 @cli.command(name="create-org")
 @click.argument("organization")
 def create_org(organization):
@@ -777,6 +788,20 @@ def validate_manifest(filename):
     if not errors and not warnings:
         click.echo(_color("GREEN", "NO WARNINGS"))
     exit(errors and 1 or 0)
+
+
+@cli.command("import-kit")
+@click.option("--category", default=None, help="Category of uploaded applications")
+@click.argument("metadata_url")
+def import_kit(metadata_url, category):
+    platform = _get_platform()
+    org = platform.get_organization(QUBELL["organization"])
+    if category:
+        category = org.categories[category]
+    click.echo("Importing from %s " % (_color("BLUE", metadata_url)), nl=False)
+    org.upload_applications(metadata_url, category)
+    click.echo(_color("GREEN", "OK"))
+
 
 if __name__ == '__main__':
     cli()
