@@ -209,7 +209,7 @@ def export_app(recursive, application, output_dir, version):
 @click.argument("filenames", nargs=-1)
 def import_app(filenames):
     platform = _get_platform()
-
+    org = platform.get_organization(QUBELL["organization"])
     regex = re.compile(r"^(.*?)(-v(\d+)|)\.[^.]+$")
     for filename in filenames:
         click.echo("Importing " + filename, nl=False)
@@ -219,7 +219,6 @@ def import_app(filenames):
             break
         app_name = regex.match(basename(filename)).group(1)
         click.echo(" => " + _color("BLUE", app_name) + " ", nl=False)
-        org = platform.get_organization(QUBELL["organization"])
         try:
             app = org.get_application(app_name)
             click.echo(app.id + _color("RED", " FAIL") + " already exists")
