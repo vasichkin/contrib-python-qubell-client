@@ -375,7 +375,7 @@ def list_instances(application, status):
     instance_candidates = \
         InstanceList(list_json_method=list_instances_json,
                      organization=org).init_router(platform._router)
-    if "DESTROYED" in status.upper() or "!" in status:
+    if any(map(lambda p: p("DESTROYED"), filters)):
         destroyed_candidates = \
             InstanceList(list_json_method=list_destroyed_instances,
                          organization=org).init_router(platform._router)
