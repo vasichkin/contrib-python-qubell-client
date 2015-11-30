@@ -403,7 +403,7 @@ def describe_instance(instance, localtime=True):
 
 def _calc_title(items, template="%s (%s)"):
     for value in items:
-        if value['id'] != value['name']:
+        if value.get('id') != value.get('name') and value.get('name'):
             value['_title'] = template % (value['id'], value['name'])
         else:
             value['_title'] = value['id']
@@ -424,12 +424,14 @@ def _describe_instance(inst, localtime=None):
     pad = "    "
     if inst.config:
         click.echo("Config: ")
-        _calc_title(inst.config)
-        _columns(inst.config, lambda o: pad + o['_title'], lambda o: pad + o['value'])
+        config = inst.config
+        _calc_title(config)
+        _columns(config, lambda o: pad + o['_title'], lambda o: pad + o['value'])
     if inst.endpoints:
         click.echo("Return values: ")
-        _calc_title(inst.endpoints)
-        _columns(inst.endpoints, lambda o: pad + o['_title'], lambda o: o['value'])
+        endpoints = inst.endpoints
+        _calc_title(endpoints)
+        _columns(endpoints, lambda o: pad + o['_title'], lambda o: o['value'])
     if inst.workflowsInfo.get('availableWorkflows', []):
         click.echo("Workflows: ")
         for workflow in inst.workflowsInfo.get('availableWorkflows', []):
