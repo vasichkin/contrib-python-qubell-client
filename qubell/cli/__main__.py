@@ -151,18 +151,30 @@ def _color(color, text):
 @cli.command(name="export-app")
 @click.option("--recursive/--non-recursive", default=False, help="Export also dependencies.")
 @click.option("--output-dir", default="", help="Output directory for manifest files, current by default.")
+@click.option("--stdout/--file", default=False, help="Print manifest to stdin instead of saving to file")
 @click.option("--version", default=None, help="Manifest version to export.")
 @click.argument("application")
-def export_app(recursive, application, output_dir, version):
+def export_app(recursive, application, output_dir, version, stdout):
+    if stdout and recursive:
+        click.echo("Using --recursive with --stdout is not supported")
+        exit(1)
+
     platform = _get_platform()
 
+    def echo_progress(*args, **kwargs):
+        if not stdout:
+            click.echo(*args, **kwargs)
+
     def _save_manifest(app, manifest, filename=None):
-        filename = filename or "%s-v%s.yml" % (app.name, manifest["version"])
-        if output_dir:
-            filename = join(output_dir, filename)
-        click.echo("=> " + filename, nl=False)
-        with open(filename, "w") as f:
-            f.write(manifest["manifest"])
+        if stdout:
+            click.echo(manifest["manifest"])
+        else:
+            filename = filename or "%s-v%s.yml" % (app.name, manifest["version"])
+            if output_dir:
+                filename = join(output_dir, filename)
+            click.echo("=> " + filename, nl=False)
+            with open(filename, "w") as f:
+                f.write(manifest["manifest"])
 
     def _child_applications(manifest_yml):
         locator_attr = "__locator.application-id"
@@ -185,16 +197,16 @@ def export_app(recursive, application, output_dir, version):
     org = platform.get_organization(QUBELL["organization"])
 
     def do_export(current_app, current_version=None):
-        click.echo("Saving " + _color("BLUE", current_app) + " ", nl=False)
+        echo_progress("Saving " + _color("BLUE", current_app) + " ", nl=False)
         try:
             current_app = org.get_application(current_app)
             if not current_version:
                 manifest = current_app.get_manifest_latest()
             else:
                 manifest = current_app.get_manifest(current_version)
-            click.echo(_color("BLUE", "v" + str(manifest["version"])) + " ", nl=False)
+            echo_progress(_color("BLUE", "v" + str(manifest["version"])) + " ", nl=False)
             _save_manifest(current_app, manifest)
-            click.echo(_color("GREEN", " OK"))
+            echo_progress(_color("GREEN", " OK"))
             if recursive:
                 app_names = _child_applications(yaml.load(manifest["manifest"], DuplicateAnchorLoader))
                 for app_name in app_names:
