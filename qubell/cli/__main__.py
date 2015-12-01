@@ -453,16 +453,69 @@ def _describe_instance(inst, localtime=None):
 @click.argument("application")
 @click.argument("name", default=None, required=False)
 def launch_instance(revision, environment, destroy, application, name, parameter):
-    print parameter
     platform = _get_platform()
     org = platform.get_organization(QUBELL["organization"])
     app = org.get_application(application)
     destroy_interval = _map_opt(destroy, lambda x: x / 1000)
     env = _map_opt(environment, org.get_environment)
-    parameters = dict(parameter)
+    parameters = dict()
+    submodules = dict()
+
+    def _get_module(modules, name):
+        path = name.split(".", 1)
+        module = modules['submodules'].get(path[0], {"submodules": {}, "parameters": {}})
+        modules['submodules'][path[0]] = module
+        if len(path) == 2:
+            return _get_module(module, path[1])
+        else:
+            return module
+
+    for (param_name, param_value) in parameter:
+        if ":" in param_name:
+            (module_name, module_param_name) = param_name.split(":", 1)
+            module = _get_module({'submodules': submodules}, module_name)
+            module['parameters'][module_param_name] = param_value
+        else:
+            parameters[param_name] = param_value
+
     inst = org.create_instance(application=app, revision=revision, environment=env,
-                               name=name, parameters=parameters, destroyInterval=destroy_interval)
+                               name=name, parameters=parameters, destroyInterval=destroy_interval,
+                               submodules=submodules)
     _describe_instance(inst, True)
+
+
+@cli.command("show-parameters")
+@click.argument("application")
+def show_instance_parameters(application):
+    platform = _get_platform()
+    org = platform.get_organization(QUBELL["organization"])
+    app = org.get_application(application)
+    params = platform._router.post_organization_launch_parameters(org_id=org.id, app_id=app.id).json()
+
+    def _render_parameters(path, module):
+        parameters = module.get("parameters", [])
+        submodules = module.get("submodules", [])
+        child_instances = filter(lambda m: m["componentType"] == "Instance", submodules)
+        if not parameters and not submodules:
+            return
+        if path:
+            click.echo("Module: " + path)
+        else:
+            click.echo("Parameters:")
+        if parameters:
+            _columns(parameters,
+                     lambda p: "  %(valueType)10s %(id)s" % p,
+                     lambda p: p["value"])
+        else:
+            click.echo("    <no parameters>")
+        click.echo()
+        if path:
+            path += "."
+        for submodule in child_instances:
+            _render_parameters(path + submodule["name"], submodule)
+
+    _render_parameters("", params.get("componentTree", {}))
+
 
 
 @cli.command("destroy-instance")

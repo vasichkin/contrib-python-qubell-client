@@ -97,6 +97,10 @@ class PrivatePath(Router):
     def post_organization_instance(self, org_id, app_id, data, cookies, ctype=".json"): pass
 
     @play_auth
+    @route("POST /organizations/{org_id}/applications/{app_id}/launchParameters{ctype}")
+    def post_organization_launch_parameters(self, org_id, app_id, cookies, data="{}", ctype=".json"): pass
+
+    @play_auth
     @route("POST /organizations/{org_id}/environments{ctype}")
     def post_organization_environment(self, org_id, data, cookies, ctype=".json"): pass
 
