@@ -443,6 +443,27 @@ def _describe_instance(inst, localtime=None):
     if inst.serviceIn:
         click.echo("Service in:")
         _columns(inst.serviceIn, lambda o: pad + o['id'], lambda o: _color("BLUE", o['name']))
+    if inst.json().get("submodules", []):
+        click.echo("Structure:")
+        _describe_submodules("", inst.json().get("submodules", []), level=1)
+
+
+_MODULE_TYPES = {
+    "submodule": "Module"
+}
+
+
+def _describe_submodules(path, submodules, level):
+    for submodule in submodules:
+        if path:
+            module_path = path + "." + submodule['componentId']
+        else:
+            module_path = submodule['componentId']
+        name = submodule.get("name", "")
+        instanceId = submodule.get("instanceId", "")
+        moduleType = _MODULE_TYPES.get(submodule.get("moduleType"), submodule.get("moduleType").capitalize())
+        click.echo("    " * level + "%s: %s %s %s" % (moduleType, module_path, _color("BLUE", name), instanceId))
+        _describe_submodules(module_path, submodule.get("submodules", []), level + 1)
 
 
 @cli.command("launch-instance")
@@ -515,7 +536,6 @@ def show_instance_parameters(application):
             _render_parameters(path + submodule["name"], submodule)
 
     _render_parameters("", params.get("componentTree", {}))
-
 
 
 @cli.command("destroy-instance")
