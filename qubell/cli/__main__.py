@@ -813,13 +813,16 @@ def export_env(environment, filename):
 @cli.command("import-env")
 @click.option("--merge/--no-merge", default=True, help="Merge or replace file contents with existing environment.")
 @click.argument("environment")
-@click.argument("filename")
+@click.argument("filename", default=None, required=False)
 def import_env(environment, filename, merge):
     platform = _get_platform()
     org = platform.get_organization(QUBELL["organization"])
     env = org.get_environment(environment)
+    env_file = filename and open(filename, "r") or sys.stdin
+    if not filename:
+        filename = "stdin"
     click.echo("Importing %s to %s " % (filename, _color("BLUE", env.name),), nl=False)
-    env.import_yaml(filename, merge=merge)
+    env.import_yaml(env_file, merge=merge)
     click.echo(_color("GREEN", "OK"))
 
 

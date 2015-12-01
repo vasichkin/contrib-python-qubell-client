@@ -190,9 +190,11 @@ class Environment(Entity, InstanceRouter):
 
     # noinspection PyShadowingBuiltins
     def import_yaml(self, file, merge=False):
-        assert os.path.exists(file)
         data = {"merge": merge}
-        files = {'path': ("filename", open(file))}
+        if isinstance(file, basestring):
+            assert os.path.exists(file)
+            file = open(file)
+        files = {'path': ("filename", file)}
         self._router.post_env_import(org_id=self.organizationId, env_id=self.environmentId, data=data, files=files)
 
     def export_yaml(self):
