@@ -157,7 +157,7 @@ class InstanceClassTest(BaseTestCase):
             assert log['severity'] == 'INFO'
 
         assert 'Active' in info_logs
-        self.assertRegexpMatches(all_logs[0], 'command started: launch \(.*\) by .*')
+        self.assertRegexpMatches(all_logs[0], r'command started: launch by (?:\(.*\))?.*')
 
         @eventually(AssertionError, MismatchError)
         def assert_eventually():
@@ -167,7 +167,8 @@ class InstanceClassTest(BaseTestCase):
                             all_logs[-1] == 'signals updated: This is default manifest')
         assert_eventually()
 
-        self.assertRegexpMatches(info_logs[0], 'command started: launch \(.*\) by .*')
+        'command started: launch by Nikolay Sokolov: in.app_input: This is default manifes'
+        self.assertRegexpMatches(info_logs[0], r'command started: launch by (?:\(.*\))?.*')
         assert 'workflow started: launch' in info_logs
         assert 'signals updated: This is default manifest' in all_logs
         assert 'This is default manifest' in all_logs
