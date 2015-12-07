@@ -63,6 +63,7 @@ class InstanceClassTest(BaseTestCase):
 
         my_inst = self.app.get_instance(id=inst.id)
         self.assertEqual(inst, my_inst)
+        self.assertEqual('This is default manifest', inst.return_values['out.app_output'])
 
         # clean
         self.assertTrue(inst.delete())
