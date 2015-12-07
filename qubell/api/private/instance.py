@@ -109,6 +109,17 @@ class Instance(Entity, ServiceMixin, InstanceRouter):
     def __parse(values):
         return dict([(val['id'], val['value']) for val in values])
 
+    @staticmethod
+    def __collect_interfaces_return(interfaces):
+        """Collect new style (44.1+) return values to old-style kv-list"""
+        acc = []
+        for (interfaceName, interfaceData) in interfaces.items():
+            signalValues = interfaceData.get("signals", {})
+            for (signalName, signalValue) in signalValues.items():
+                pinName = "{}.{}".format(interfaceName, signalName)
+                acc.append({'id': pinName, 'value': signalValue})
+        return acc
+
     @property
     def return_values(self):
         """ Guess what api we are using and return as public api does.
@@ -117,10 +128,11 @@ class Instance(Entity, ServiceMixin, InstanceRouter):
 
         j = self.json()
         #TODO: FIXME: get rid of old API when its support will be removed
-        old_api_value = j.get('returnValues')
-        new_api_value = j.get('endpoints')
+        public_api_value = j.get('returnValues')
+        old_private_value = j.get('endpoints')
+        new_private_value = self.__collect_interfaces_return(j.get('interfaces', {}))
 
-        retvals = new_api_value or old_api_value or []
+        retvals = new_private_value or old_private_value or public_api_value or []
         # TODO: Public api hack.
         if self._router.public_api_in_use:
             return retvals
