@@ -81,9 +81,17 @@ def route(route_str):  # decorator param
             try:
                 response = self._session.request(method, destination_url, verify=self.verify_ssl, **bypass_args)
             except requests.ConnectionError:
-                log.info('ConnectionError caught. Trying again')
+                log.info('ConnectionError caught. Trying again: \n %s:%s ' % (method, destination_url))
+                import traceback
+                def log_exception(exc_class, exc, tb):
+                    log.info('Got exception: %s' % exc)
+                    log.info('Class: %s' % exc_class)
+                    log.info('Trace: %s' % traceback.format_tb(tb))
+                    log.error('Got exception while executing: %s' % exc)
+                log_exception(*sys.exc_info())
                 time.sleep(2)
                 response = self._session.request(method, destination_url, verify=self.verify_ssl, **bypass_args)
+
             end = time.time()
             elapsed = int((end - start) * 1000.0)
             ilog(elapsed)
