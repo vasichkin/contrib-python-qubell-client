@@ -208,11 +208,11 @@ class PrivatePath(Router):
     def post_instance_reschedule(self, org_id, instance_id, workflow_id, data, cookies, ctype=".json"): pass
 
     @play_auth
-    @route("GET /organizations/{org_id}/runtime-components/{component_id}{ctype}")
+    @route("GET /organizations/{org_id}/runtimeComponents/{component_id}{ctype}")
     def get_component_details(self, org_id, component_id, cookies, ctype=".json"): pass
 
     @play_auth
-    @route("GET /organizations/{org_id}/runtime-components{ctype}")
+    @route("GET /organizations/{org_id}/runtimeComponents{ctype}")
     def get_components(self, org_id, cookies, params=None, ctype=".json"): pass
 
     #Environment
