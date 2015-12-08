@@ -218,35 +218,66 @@ def export_app(recursive, application, output_dir, version, stdout):
 
 
 @cli.command(name="import-app")
-@click.option("--category", default=None, help="Category in which applications will be created")
+@click.option("--category", default=None, help="Category name in which app will be created. "
+                                               "If app already exists, its category will be updated.")
+@click.option("--app-id", default=None,
+              help="Application id, allowed only if one filename given. Disables --app-name if provided."
+                   "If app with such id not found, new app won't be created.")
+@click.option("--app-name", default=None,
+              help="Application name, allowed only if one filename given. Is ignored if --app-id is provided."
+                   "Has higher priority than file name.")
 @click.option("--overwrite/--no-overwrite", default=False, help="Upload manifest for already existing applications")
 @click.argument("filenames", nargs=-1)
-def import_app(filenames, category, overwrite):
+def import_app(filenames, category, overwrite, app_id, app_name):
+    """ Upload application from file.
+
+    By default, file name will be used as application name, with "-vXX.YYY" suffix stripped.
+    Application is looked up by one of these classifiers, in order of priority:
+    app-id, app-name, filename.
+
+    If app-id is provided, looks up existing application and updates its manifest.
+    If app-id is NOT specified, looks up by name, or creates new application.
+
+    """
     platform = _get_platform()
     org = platform.get_organization(QUBELL["organization"])
     if category:
         category = org.categories[category]
     regex = re.compile(r"^(.*?)(-v(\d+)|)\.[^.]+$")
+    if (app_id or app_name) and len(filenames) > 1:
+        raise Exception("--app-id and --app-name are supported only for single-file mode")
     for filename in filenames:
         click.echo("Importing " + filename, nl=False)
-        match = regex.match(basename(filename))
-        if not match:
-            click.echo(_color("RED", "FAIL") + " unknown filename format")
-            break
-        app_name = regex.match(basename(filename)).group(1)
-        click.echo(" => " + _color("BLUE", app_name) + " ", nl=False)
-        if not overwrite:
-            try:
-                app = org.get_application(app_name)
-                click.echo(app.id + _color("RED", " FAIL") + " already exists")
+        if not app_name:
+            match = regex.match(basename(filename))
+            if not match:
+                click.echo(_color("RED", "FAIL") + " unknown filename format")
                 break
-            except NotFoundError:
-                pass
+            app_name = regex.match(basename(filename)).group(1)
+        click.echo(" => ", nl=False)
+        app = None
+        try:
+            app = org.get_application(id=app_id, name=app_name)
+            if app and not overwrite:
+                click.echo("%s %s already exists %s" % (
+                    app.id, _color("BLUE", app and app.name or app_name), _color("RED", "FAIL")))
+                break
+        except NotFoundError:
+            if app_id:
+                click.echo("%s %s not found %s" % (
+                    app_id or "", _color("BLUE", app and app.name or app_name), _color("RED", "FAIL")))
+                break
+        click.echo(_color("BLUE", app and app.name or app_name) + " ", nl=False)
         try:
             with file(filename, "r") as f:
-                app = org.application(name=app_name, manifest=Manifest(content=f.read()))
-            if category:
-                app.update(category=category.id)
+                if app:
+                    app.update(name=app.name,
+                               category=category and category.id or app.category,
+                               manifest=Manifest(content=f.read()))
+                else:
+                    app = org.application(id=app_id, name=app_name, manifest=Manifest(content=f.read()))
+                    if category:
+                        app.update(category=category.id)
             click.echo(app.id + _color("GREEN", " OK"))
         except IOError as e:
             click.echo(_color("RED", " FAIL") + " " + e.message)
