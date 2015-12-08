@@ -439,7 +439,7 @@ def _describe_instance(inst, localtime=None):
         config = inst.config
         _calc_title(config)
         _columns(config, lambda o: pad + o['_title'], lambda o: pad + o['value'])
-    if inst.endpoints:
+    if inst.return_values:
         click.echo("Return values: ")
         endpoints = inst.endpoints
         _calc_title(endpoints)
