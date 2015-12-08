@@ -601,6 +601,25 @@ def _pad(string, length):
     return ("%-" + str(length) + "s") % string
 
 
+def _parse_timestamp(datetime, localtime=False):
+    time_t = datetime
+    try:
+        time_t = int(datetime)
+    except Exception:
+        pass
+    try:
+        time_t = time.strptime(datetime, "%Y-%m-%d %H:%M:%S")
+    except Exception:
+        pass
+    if not time_t:
+        raise ValueError("unknown timestamp format: " + str(datetime))
+    if not localtime:
+        time_shift = time.mktime(time.localtime()) - time.mktime(time.gmtime())
+    else:
+        time_shift = 0
+    return time.mktime(time_t) + time_shift
+
+
 @cli.command("show-instance-logs")
 @click.option("--severity", default="INFO", help="Logs severity.")
 @click.option("--localtime/--utctime", default=True, help="Use local or UTC time.")
@@ -612,15 +631,23 @@ def _pad(string, length):
               help="Limit number of items to show. Positive integer for tail, negative integer for head.")
 @click.option("--follow/--no-follow", default=False, help="Wait for new messages to appear.")
 @click.option("--show-all/--no-show-all", default=False, help="Show all messages, overrides --max-items.")
+@click.option("--before", default=None, help="Show messages before TIMESTAMP")
+@click.option("--after", default=None, help="Show messages after TIMESTAMP")
 @click.argument("instance")
-def show_logs(instance, localtime, severity, sort_by, hide_multiline, filter_text, max_items, show_all, follow):
+def show_logs(instance, localtime, severity, sort_by, hide_multiline, filter_text, max_items, show_all, follow,
+              before, after):
     platform = _get_platform()
     org = platform.get_organization(QUBELL["organization"])
     inst = org.get_instance(instance)
     accepted_severities = list(itertools.takewhile(lambda x: x != severity, SEVERITIES)) + [severity]
 
-    def show_activitylog(after=None):
-        activitylog = inst.get_activitylog(severity=accepted_severities, after=after)
+    if after:
+        after = int(_parse_timestamp(after, localtime)) * 1000
+    if before:
+        before = int(_parse_timestamp(before, localtime)) * 1000
+
+    def show_activitylog(after=None, before=before):
+        activitylog = inst.get_activitylog(severity=accepted_severities, after=after, end=before)
 
         if not activitylog or not len(activitylog):
             return
@@ -669,9 +696,8 @@ def show_logs(instance, localtime, severity, sort_by, hide_multiline, filter_tex
                     vertical_padding_before = True
         return activitylog
 
-    after = None
     while True:
-        last_log = show_activitylog(after=after)
+        last_log = show_activitylog(after=after, before=before)
         if last_log and len(last_log):
             after = max(map(lambda i: i['time'], last_log.log))
             after += 1  # add extra millisecond to avoid showning same line twice
