@@ -354,6 +354,11 @@ class Instance(Entity, ServiceMixin, InstanceRouter):
         accepted_states = ['Destroying', 'Active', 'Running', 'Executing', 'Unknown', 'Error']
         return waitForStatus(instance=self, final='Destroyed', accepted=accepted_states, timeout=[timeout*20, 3, 1])
 
+    _ALL_STATES = ('Destroying', 'Active', 'Running', 'Executing', 'Unknown', 'Error', 'Requested')
+
+    def wait_status(self, final_status, accepted_status=_ALL_STATES, timeout=3):  # Shortcut for convenience. Timeout = 3 min (ask timeout*6 times every 10 sec)
+        return waitForStatus(instance=self, final=final_status, accepted=accepted_status, timeout=[timeout * 20, 3, 1])
+
     def run_workflow(self, name, component_path=None, parameters=None):
         if not parameters:
             parameters = {}
