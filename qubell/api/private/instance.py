@@ -557,33 +557,50 @@ class ActivityLog(object):
         return text
 
     def __contains__(self, item):
-        return True if self.find(item) else False
+        try:
+            self.find(item)
+            return True
+        except exceptions.NotFoundError:
+            return False
 
     def __getitem__(self, item):
         """
         Guess what item to return: time, index or description
-        log[0] will return first entry
-        log[1402654329064] will return description of event with tis time
+        log[0] will return first entry as string
+        log[1402654329064] will return description of FIRST event with this time as string
         log['Status is Active'] will return time of event, if found.
+        log[1:4] will return subset of self
         """
+        stringify = lambda i: '{0}: {1}'.format(i['eventTypeText'], i['description'])
+        def not_found(hint=''):
+            raise exceptions.NotFoundError(
+                "Activitylog item not found: '{}', due to {}".format(item, hint))
 
         if isinstance(item, int):
-            if item > 1000000000000:
-                return ['{0}: {1}'.format(x['eventTypeText'], x['description'])
-                        for x in self.log if x['time'] == item][0]
-            return '{0}: {1}'.format(self.log[item]['eventTypeText'], self.log[item]['description'])
+            if item > 1000000000000:  # assume time
+                items = [stringify(x) for x in self.log if x['time'] == item]
+                if len(items) == 0:
+                    not_found('absence as time')
+                return items[0]
+            try:
+                return stringify(self.log[item])
+            except IndexError:
+                not_found('absence as index')
         elif isinstance(item, str):
             return self.find(item)[0]
         elif isinstance(item, slice):
             # noinspection PyTypeChecker
             return ActivityLog(self.log[item], severity=self.severity)
+        # todo: check regression logs and replace with `raise LookupError`
+        log.warning("Unknown lookup method '{}' for ActivityLog".format(item))
         return False
 
     def find(self, item, description='', event_type=''):
-        """ Find regexp in activitylog
-        find record as if type are in description.
-        #TODO: should be refactored, dumb logic
         """
+        Find regexp in activitylog
+        find record as if type are in description.
+        """
+        # TODO: should be refactored, dumb logic
         if ': ' in item:
             splited = item.split(': ', 1)
             if splited[0] in self.TYPES:
@@ -601,9 +618,22 @@ class ActivityLog(object):
         else:
             found = [x['time'] for x in self.log if re.search(description, x['description'])]
 
-        return found if len(found) else None
+        if len(found):
+            return found
+        raise exceptions.NotFoundError("Item '{}' is not found with (description='{}', event_type='{}')".
+                                       format(item, description, event_type))
 
     def get_interval(self, start_text=None, end_text=None):
+
+        # guard
+        def not_found(hint=''):
+            raise exceptions.NotFoundError(
+                'Activitylog interval not found: [{} , {}], due to {}'.format(start_text, end_text, hint))
+        if start_text and start_text not in self:
+            not_found('start_text is absent')
+        if end_text and end_text not in self:
+            not_found('end_text is absent')
+
         if start_text:
             begin = self.find(start_text)
             interval = ActivityLog(self.log, self.severity, start=begin[0])
@@ -616,6 +646,8 @@ class ActivityLog(object):
 
         if len(interval):
             return interval
-        raise exceptions.NotFoundError('Activitylog interval not found: [%s , %s]' % (start_text, end_text))
+
+        not_found('nothing within boundaries')
+
 
 activityLog = ActivityLog  # todo: remove this
