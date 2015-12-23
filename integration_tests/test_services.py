@@ -28,6 +28,7 @@ class ServiceClassTest(BaseTestCase):
         self.org = self.organization
         self.env = self.org.create_environment(name='Self-ServiceClassTest-Env')
         self.app = self.org.application(manifest=self.manifest, name='Self-ServiceClassTest')
+        self.app.clean()
 
     def teardown_once(self):
         self.env.delete()
