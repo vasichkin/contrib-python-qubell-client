@@ -124,22 +124,26 @@ def _get_platform():
 
 
 @cli.command(name="list-apps")
-def list_apps():
+@click.option("--verbose/--quiet", default=False, help="Verbose output")
+def list_apps(verbose):
     _platform = _get_platform()
 
     org = _platform.get_organization(QUBELL["organization"])
     for app in org.applications:
-        instances = app.instances
-        by_status = {}
-        by_status['DESTROYED'] = len(app.destroyed_instances)
-        for instance in instances:
-            key = instance.status.upper()
-            by_status[key] = by_status.get(key, 0) + 1
-        for (status, color) in STATUS_COLORS.iteritems():
-            by_status[status] = _color(color, str(by_status.get(status, 0)))
-        click.echo(app.id + " " +
-                   "(%(ACTIVE)s/%(LAUNCHING)s/%(EXECUTING)s/%(DESTROYING)s/%(FAILED)s/%(DESTROYED)s) " % by_status +
-                   _color("BLUE", app.name))
+        if verbose:
+            instances = app.instances
+            by_status = {}
+            by_status['DESTROYED'] = len(app.destroyed_instances)
+            for instance in instances:
+                key = instance.status.upper()
+                by_status[key] = by_status.get(key, 0) + 1
+            for (status, color) in STATUS_COLORS.iteritems():
+                by_status[status] = _color(color, str(by_status.get(status, 0)))
+            click.echo(app.id + " " +
+                       "(%(ACTIVE)s/%(LAUNCHING)s/%(EXECUTING)s/%(DESTROYING)s/%(FAILED)s/%(DESTROYED)s) " % by_status +
+                       _color("BLUE", app.name))
+        else:
+            click.echo(app.id + " " + _color("BLUE", app.name))
 
 
 def _color(color, text):
