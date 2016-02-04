@@ -41,10 +41,3 @@ class PlatformClassTest(BaseTestCase):
         ids = set([o.id for o in self.platform.organizations])
         minion_ids = set([o.id for o in minion_platform.organizations])
         assert ids != minion_ids
-
-    @unittest.skipIf("localhost" in os.environ['QUBELL_TENANT'] or "127.0.0.1" in os.environ['QUBELL_TENANT'],
-                     "local version doesn't have version")
-    def test_get_backends(self):
-        backends = self.platform.get_backends_versions()
-        assert 'Qubell/us-east' in backends.keys()
-        assert float(backends['Qubell/us-east']) > 30

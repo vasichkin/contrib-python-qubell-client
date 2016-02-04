@@ -25,6 +25,12 @@ class RouterTests(unittest.TestCase):
             assert not self.router.is_connected
 
     def test_exception_if_not_get_connected(self):
-        with self.assertRaises(ApiUnauthorizedError) as context, patch("requests.session"):
-            self.router.connect("any@where", "**wrong**")
-        assert str(context.exception) == "Authentication failed, please check settings"
+        with patch.object(self.router, "_session"):
+            with self.assertRaises(ApiUnauthorizedError) as context:
+                self.router.connect("any@where", "**wrong**")
+            assert str(context.exception) == "Authentication failed, please check settings"
+    
+    def test_url_trim(self):
+        url = "http://my.router.org"
+        router = Router(url + "/")
+        assert router.base_url == url

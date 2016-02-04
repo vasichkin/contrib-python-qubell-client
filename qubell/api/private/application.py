@@ -78,8 +78,10 @@ class Application(Entity, InstanceRouter):
         log.info("Application %s created (%s)" % (name, app.applicationId))
         return app
 
-    def delete(self):
+    def delete(self, clean=False):
         log.info("Removing application: id=%s" % self.applicationId)
+        if clean:
+            self.clean()
         self._router.delete_application(org_id=self.organizationId, app_id=self.applicationId)
         return True
 

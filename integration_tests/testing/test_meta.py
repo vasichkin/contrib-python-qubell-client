@@ -16,9 +16,9 @@ class TestMeta(TestCase):
         self.cls.organization.restore = self.restore
 
     def test_meta_url(self):
-        self.cls.upload_metadata_applications("https://raw.githubusercontent.com/qubell-bazaar/component-mysql-dev/1.1-35p/meta.yml")
+        self.cls.organization.set_applications_from_meta("https://raw.githubusercontent.com/qubell-bazaar/component-mysql-dev/1.1-35p/meta.yml")
         assert 'Database' in self.meta['applications'][0]['name']
 
     def test_meta_file(self):
-        self.cls.upload_metadata_applications(os.path.join(os.path.dirname(__file__), "./meta.yml"))
+        self.cls.organization.set_applications_from_meta(os.path.join(os.path.dirname(__file__), "./meta.yml"))
         assert 'Database' in self.meta['applications'][0]['name']

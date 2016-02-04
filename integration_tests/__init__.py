@@ -13,6 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 from qubell.api.provider import log_routes_stat
+import logging
 
 __author__ = "Vasyl Khomenko"
 __copyright__ = "Copyright 2013, Qubell.com"
@@ -26,3 +27,7 @@ This module keeps Integration Tests, live Platform required
 import atexit
 
 atexit.register(log_routes_stat)
+
+logger = logging.getLogger("qubell")
+logging.getLogger().setLevel(logging.INFO)
+logger.setLevel(logging.INFO)

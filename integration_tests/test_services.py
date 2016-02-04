@@ -28,6 +28,7 @@ class ServiceClassTest(BaseTestCase):
         self.org = self.organization
         self.env = self.org.create_environment(name='Self-ServiceClassTest-Env')
         self.app = self.org.application(manifest=self.manifest, name='Self-ServiceClassTest')
+        self.app.clean()
 
     def teardown_once(self):
         self.env.delete()
@@ -36,10 +37,13 @@ class ServiceClassTest(BaseTestCase):
     def test_create_service_method(self):
         """ Check basic service creation works
         """
-        serv = self.org.create_service(application=self.app)
+        env_service = self.org.create_environment(name='Self-ServiceClassTest-ServiceEnv')
+        self.addCleanup(lambda: env_service.delete())
+        env_service.init_common_services(with_cloud_account=False)
+        serv = self.org.create_service(application=self.app, environment=env_service)
         self.assertTrue(serv.ready())
         self.assertTrue(serv in self.org.services)
-        self.assertTrue(serv in self.environment.services)
+        self.assertTrue(serv in env_service.services)
         self.assertTrue(serv in self.org.instances)
         self.assertEqual('This is default manifest', serv.returnValues['out.app_output'])
         self.assertFalse(serv.destroyAt)
@@ -61,7 +65,7 @@ class ServiceClassTest(BaseTestCase):
         self.assertTrue(serv.delete())
         self.assertTrue(serv.destroyed())
         self.assertFalse(serv in self.org.services)
-        self.assertFalse(serv in self.environment.services)
+        self.assertFalse(serv in env_service.services)
 
     def check_service(self, serv):
         self.assertTrue(serv.ready())

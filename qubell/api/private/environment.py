@@ -347,11 +347,15 @@ class Environment(Entity, InstanceRouter):
                 env.add_service(key_service, force=True)
             return wf_service, key_service
 
-        cloud_account_service = self.organization.service(name=zone_names.DEFAULT_CLOUD_ACCOUNT_SERVICE,
+        cloud_account_service = self.organization.instance(name=zone_names.DEFAULT_CLOUD_ACCOUNT_SERVICE,
                                                           application=type_to_app(CLOUD_ACCOUNT_TYPE),
                                                           environment=self,
-                                                          parameters=PROVIDER_CONFIG)
+                                                          parameters=PROVIDER_CONFIG,
+                                                          destroyInterval=0)
+        # Imidiate adding to env cause CA not to drop destroy interval. Known issue 6132. So, add service as instance with
+        # destroyInterval set to 'never'
         assert cloud_account_service.running()
+
         with self as env:
             env.add_service(wf_service, force=True)
             env.add_service(key_service, force=True)

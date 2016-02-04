@@ -32,6 +32,7 @@ class InstanceClassTest(BaseTestCase):
         super(InstanceClassTest, self).setup_once()
         self.org = self.organization
         self.app = self.org.application(manifest=self.manifest, name='Self-InstanceClassTest')
+        self.app.clean()
         self.ins = self.org.create_instance(application=self.app, name='Self-InstanceClassTest-Instance')
         assert self.ins.ready()
 
@@ -63,6 +64,7 @@ class InstanceClassTest(BaseTestCase):
 
         my_inst = self.app.get_instance(id=inst.id)
         self.assertEqual(inst, my_inst)
+        self.assertEqual('This is default manifest', inst.return_values['out.app_output'])
 
         # clean
         self.assertTrue(inst.delete())
@@ -156,7 +158,7 @@ class InstanceClassTest(BaseTestCase):
             assert log['severity'] == 'INFO'
 
         assert 'Active' in info_logs
-        self.assertRegexpMatches(all_logs[0], 'command started: launch \(.*\) by .*')
+        self.assertRegexpMatches(all_logs[0], r'command started: launch by (?:\(.*\))?.*')
 
         @eventually(AssertionError, MismatchError)
         def assert_eventually():
@@ -166,10 +168,14 @@ class InstanceClassTest(BaseTestCase):
                             all_logs[-1] == 'signals updated: This is default manifest')
         assert_eventually()
 
-        self.assertRegexpMatches(info_logs[0], 'command started: launch \(.*\) by .*')
-        assert 'workflow started: launch' in info_logs
-        assert 'signals updated: This is default manifest' in all_logs
-        assert 'This is default manifest' in all_logs
+        @eventually(AssertionError, MismatchError)
+        def assert_eventually():
+            # example: 'command started: launch by Ivan Ivanov: in.app_input: This is default manifest'
+            self.assertRegexpMatches(info_logs[0], r'command started: launch by (?:\(.*\))?.*')
+            assert 'workflow started: launch' in info_logs
+            assert 'signals updated: This is default manifest' in all_logs
+            assert 'This is default manifest' in all_logs
+        assert_eventually()
 
         interval = info_logs.get_interval(start_text="workflow started: launch",
                                           end_text="workflow finished: launch with status \'Succeeded\'")

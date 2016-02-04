@@ -61,21 +61,37 @@ def route(route_str):  # decorator param
             destination_url = self.base_url + get_destination_url()
             f(*args, **kwargs)  # generally this is "pass"
 
-            bypass_args = dict([(param, route_args[param]) for param in ["data", "cookies", "auth", "files", "content_type", "params"] if param in route_args])
+            bypass_args = dict([
+                (param, route_args[param]) for param in ["data", "json", "cookies", "auth", "files", "content_type", "params"] if param in route_args
+            ])
 
             #add json content type for:
-            # - all public api, meaning have basic auth
-            # - private that ends with .json
             # - unless files are sent
-            if "files" not in bypass_args and (destination_url.endswith('.json') or "auth" in route_args):
+            # - private that ends with .json
+            # - all public api with POST/PUT method, meaning have basic auth
+            # - json parameter is present
+            if "files" not in bypass_args and (destination_url.endswith('.json') or "json" in route_args or ("auth" in bypass_args and method in ["POST", "PUT"])):
                 bypass_args['headers'] = {'Content-Type': 'application/json'}
 
-            if "content_type" in bypass_args and bypass_args['content_type']=="yaml":
+            if "content_type" in bypass_args and bypass_args['content_type'] == "yaml":
                 del bypass_args["content_type"]
                 bypass_args['headers'] = {'Content-Type': 'application/x-yaml'}
 
             start = time.time()
-            response = self._session.request(method, destination_url, verify=self.verify_ssl, **bypass_args)
+            try:
+                response = self._session.request(method, destination_url, verify=self.verify_ssl, **bypass_args)
+            except requests.ConnectionError:
+                log.info('ConnectionError caught. Trying again: \n %s:%s ' % (method, destination_url))
+                import traceback
+                def log_exception(exc_class, exc, tb):
+                    log.info('Got exception: %s' % exc)
+                    log.info('Class: %s' % exc_class)
+                    log.info('Trace: %s' % traceback.format_tb(tb))
+                    log.error('Got exception while executing: %s' % exc)
+                log_exception(*sys.exc_info())
+                time.sleep(2)
+                response = self._session.request(method, destination_url, verify=self.verify_ssl, **bypass_args)
+
             end = time.time()
             elapsed = int((end - start) * 1000.0)
             ilog(elapsed)

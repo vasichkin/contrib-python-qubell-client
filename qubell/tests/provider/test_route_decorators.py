@@ -1,4 +1,5 @@
 import unittest
+
 from mock import patch
 
 from qubell.api.private.exceptions import ApiUnauthorizedError, ApiAuthenticationError, ApiNotFoundError, ApiError
@@ -41,6 +42,9 @@ class RouterDecoratorTests(unittest.TestCase):
         @route("GET /named/{prefix}{some_name}")
         def get_named(self, some_name, prefix="id"): pass
 
+        @route("POST /json")
+        def post_json(self, json): pass
+
         @play_auth
         @route("POST /auth")
         def post_something_privetly(self, cookies): pass
@@ -48,6 +52,10 @@ class RouterDecoratorTests(unittest.TestCase):
         @basic_auth
         @route("POST /auth")
         def post_something_publicly(self, auth): pass
+
+        @basic_auth
+        @route("DELETE /auth")
+        def delete_something_publicly(self, auth): pass
 
         @play_auth
         @route("GET /simple.json")
@@ -71,6 +79,12 @@ class RouterDecoratorTests(unittest.TestCase):
         request_mock.return_value = gen_response()
         self.router.post_simple(data="many data")
         request_mock.assert_called_once_with('POST', 'http://nowhere.com/simple', verify=False, data="many data")
+
+    def test_json_post(self, request_mock):
+        request_mock.return_value = gen_response()
+        self.router.post_json(json={"key": "value"})
+        request_mock.assert_called_once_with('POST', "http://nowhere.com/json", verify=False,
+                                             headers=json_header, json={"key": "value"})
 
     def test_parameters(self, request_mock):
         request_mock.return_value = gen_response()
@@ -107,6 +121,13 @@ class RouterDecoratorTests(unittest.TestCase):
         self.router.post_something_publicly()
         request_mock.assert_called_once_with('POST', 'http://nowhere.com/auth', verify=False, auth="Encoding...",
                                              headers=json_header)
+
+    def test_basic_auth_delete(self, request_mock):
+        request_mock.return_value = gen_response()
+        self.router._auth = "Encoding..."
+        self.router.delete_something_publicly()
+        # no JSON content type
+        request_mock.assert_called_once_with('DELETE', 'http://nowhere.com/auth', verify=False, auth="Encoding...")
 
     def test_basic_when_auth_forced(self, request_mock):
         with self.assertRaises(AttributeError) as context:

@@ -4,6 +4,7 @@ import unittest
 import functools
 import nose.plugins.attrib
 import testtools
+import os
 
 
 from qubell.api.private.platform import QubellPlatform
@@ -22,6 +23,14 @@ except:
 __all__ = ['BaseComponentTestCase', 'applications', 'environment', 'environments', 'instance', 'values', 'workflow',
            'eventually', 'attr', 'unique']
 
+
+logger = log.getLogger("qubell")
+if os.getenv('QUBELL_LOG_LEVEL', 'info') == 'debug':
+    log.getLogger().setLevel(log.DEBUG)
+    logger.setLevel(log.DEBUG)
+else:
+    log.getLogger().setLevel(log.INFO)
+    logger.setLevel(log.INFO)
 
 class Qubell(object):
     """
