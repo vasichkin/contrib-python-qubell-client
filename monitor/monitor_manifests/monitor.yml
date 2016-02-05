@@ -1,0 +1,69 @@
+application:
+  interfaces:
+    vault-info:
+      fingerprint: bind(monitor#result.fingerprint)
+      publicKey: bind(monitor#result.public-key)
+  bindings:
+    - [genesis, monitor] #Todo: remove on strategy release
+    - [keystore, monitor]
+    - [monitor-child, monitor]
+
+  components:
+    #Todo: remove on strategy release
+    genesis:
+      type: reference.Service
+      interfaces:
+        executor:
+          execute-workflow: receive-command(object request => object status => object status)
+          execute-command: send-command(string interface, string command, map<string, object> arguments => map<string, object> response => map<string, object> response)
+    keystore:
+      type: reference.Service
+      interfaces:
+        keypair-store:
+          get-keypair:      receive-command(string id => object privateKey)
+          get-public-key:   receive-command(string id => string fingerprint, string publicKey)
+    monitor-child:
+      type: reference.Submodule
+      configuration:
+        __locator.application-id: "monitor-child"
+      interfaces:
+        vault:
+          key-id: publish-signal(string)
+    monitor:
+      type: workflow.Instance
+      interfaces:
+        keystore:
+          get-keypair:       send-command(string id => object privateKey)
+          get-public-key:   send-command(string id => string fingerprint, string publicKey)
+        vault-info:
+          key-id: consume-signal(string)
+        result:
+          fingerprint: publish-signal(string)
+          public-key: publish-signal(string)
+      required: [keystore, vault-info]
+      configuration:
+        configuration.workflows:
+          launch:
+            steps:
+              get-info-from-child:
+                action: getEnvironmentProperties
+                phase: init
+                output:
+                    env: result
+              get-public-key:
+                action: serviceCall
+                precedingPhases: [init]
+                parameters:
+                    timeout: 5
+                    service: keystore
+                    command: get-public-key
+                    arguments:
+                      id: "{$.env.vault-info.key-id}"
+                output:
+                    result: result
+            return:
+              fingerprint:
+                value: "{$.result.fingerprint}"
+              public-key:
+                value: "{$.result.publicKey}"
+          destroy: {steps: []}

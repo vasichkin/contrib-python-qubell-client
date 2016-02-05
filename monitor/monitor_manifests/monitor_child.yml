@@ -1,0 +1,45 @@
+application:
+  interfaces:
+    vault:
+      key-id: bind(monitor-helper#result.key-id)
+  bindings:
+    - [genesis, monitor-helper] #Todo: remove on strategy release
+    - [env-properties, monitor-helper]
+  components:
+    genesis:
+      #Todo: remove on strategy release
+      type: reference.Service
+      interfaces:
+        executor:
+          execute-workflow: receive-command(object request => object status => object status)
+          execute-command: send-command(string interface, string command, map<string, object> arguments => map<string, object> response => map<string, object> response)
+    env-properties:
+      type: reference.Service
+      interfaces:
+        properties:
+          publicKeyId: publish-signal(string)
+    env-markers:
+      type: reference.Service
+      interfaces:
+        has-monitor:
+          monitor: publish-signal(unit)
+    monitor-helper:
+      type: workflow.Instance
+      interfaces:
+        vault:
+          publicKeyId: consume-signal(string)
+        result:
+          key-id: publish-signal(string)
+      required: [vault]
+      configuration:
+        configuration.workflows:
+          launch:
+            steps:
+              get-id:
+                action: getEnvironmentProperties
+                output:
+                    result: result
+            return:
+              key-id:
+                value: "{$.result.vault.publicKeyId}"
+          destroy: {steps: []}
