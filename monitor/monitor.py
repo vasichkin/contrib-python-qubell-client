@@ -21,7 +21,7 @@ parser.add_argument('-d', '--dryrun', help='Do not launch application, only crea
 parser.add_argument('-u', '--user', help='Email of registered user on tonomi platform')
 parser.add_argument('-p', '--password', help='Password for user')
 parser.add_argument('-t', '--tenant', help='Url to platform')
-parser.add_argument('-o', '--org', help='Organization name to use. Default is ==Monitor==')
+parser.add_argument('-o', '--org', help='Organization name to use. Default is -=Monitor=-')
 parser.add_argument('-z', '--zone', help='Zone name to use. Default is root zone')
 
 
@@ -34,7 +34,7 @@ if args.verbose:
 user = args.user or os.getenv('QUBELL_USER')
 password = args.password or os.getenv('QUBELL_PASSWORD')
 tenant = args.tenant or os.getenv('QUBELL_TENANT')
-organization = args.org or os.getenv('QUBELL_ORGANIZATION') or '==Monitor=='
+organization = args.org or os.getenv('QUBELL_ORGANIZATION') or '-=Monitor=-'
 zone = args.zone or os.getenv('QUBELL_ZONE')
 
 assert user
