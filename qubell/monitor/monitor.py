@@ -126,8 +126,11 @@ class Monitor(object):
             assert False, "Key cannot be downloaded outside"
         assert "RSA PRIVATE KEY" in key, "Key downloaded, but doesn't look as rsa key"
 
+def main():
+    mnt = Monitor(tenant=tenant, user=user, password=password, organization=organization, zone=zone)
+    if not args.dryrun:
+        mnt.download_key()
+        mnt.launch_monitor()
 
-mnt = Monitor(tenant=tenant, user=user, password=password, organization=organization, zone=zone)
-if not args.dryrun:
-    mnt.download_key()
-    mnt.launch_monitor()
+if __name__ == '__main__':
+    main()
