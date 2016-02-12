@@ -1,5 +1,6 @@
 include LICENSE
 include README.rts
+include qubell/monitor/monitor_manifests/*
 recursive-include qubell *.py
 prune stories
 prune test_qubell_client
