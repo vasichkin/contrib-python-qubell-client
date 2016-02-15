@@ -37,11 +37,10 @@ class Application(Entity, InstanceRouter):
     """
 
     # noinspection PyShadowingBuiltins
-    def __init__(self, organization, id, name):
+    def __init__(self, organization, id):
         self.organization = organization
         self.organizationId = self.organization.organizationId
         self.applicationId = self.id = id
-        self.name = name
 
         self.launch = self.create_instance = functools.partial(organization.create_instance, application=self)
 
@@ -62,6 +61,10 @@ class Application(Entity, InstanceRouter):
     @property
     def defaultEnvironment(self):
         return self.organization.get_default_environment()
+
+    @property
+    def name(self):
+        return self.json()['name']
 
     @staticmethod
     def new(organization, name, manifest, router):
@@ -206,10 +209,3 @@ class Application(Entity, InstanceRouter):
 class ApplicationList(QubellEntityList):
     base_clz = Application
 
-    # noinspection PyUnresolvedReferences
-    def _get_item(self, id_name):
-        assert self.base_clz, "Define 'base_clz' in constructor or override this method"
-        entity = self.base_clz(organization=self.organization, id=id_name.id, name=id_name.name)
-        if isinstance(entity, InstanceRouter):
-            entity.init_router(self._router)
-        return entity
