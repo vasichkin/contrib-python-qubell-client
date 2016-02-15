@@ -1,10 +1,10 @@
-Python-qubell-client
-
+python-qubell-client
+====================
 
 Installation
 ============
 
-pip install qubell-api-python-client
+    pip install qubell-api-python-client
 
 
 Configuration
@@ -23,31 +23,74 @@ By default Amazon ec2 used (in us-east zone)
 
 Example:
 
-export QUBELL_TENANT="https://express.qubell.com"
-export QUBELL_USER="user@gmail.com"
-export QUBELL_PASSWORD="password"
-export QUBELL_ORGANIZATION="my-org"
+    export QUBELL_TENANT="https://express.qubell.com"
+    export QUBELL_USER="user@gmail.com"
+    export QUBELL_PASSWORD="password"
+    export QUBELL_ORGANIZATION="my-org"
 
 # Additional parameters
-export PROVIDER_TYPE="aws-ec2"
-export PROVIDER_REGION="us-east-1"
-export PROVIDER_IDENTITY="FFFFFFFFF"
-export PROVIDER_CREDENTIAL="FFFFFFFFFF"
+
+    export PROVIDER_TYPE="aws-ec2"
+    export PROVIDER_REGION="us-east-1"
+    export PROVIDER_IDENTITY="FFFFFFFFF"
+    export PROVIDER_CREDENTIAL="FFFFFFFFFF"
 
 
+CLI Tool
+========
+
+Some operations are available direcly through CLI interface, like creating orgs,
+initializing cloud accounts, and importing/exporting applications.
+
+    $ python -mqubell.cli 
+    Usage: __main__.py [OPTIONS] COMMAND [ARGS]...
+    
+    Options:
+      --tenant TEXT        Tenant url to use, QUBELL_TENANT by default
+      --user TEXT          User to use, QUBELL_USER by default
+      --password TEXT      Password to use, QUBELL_PASSWORD by default
+      --organization TEXT  Organization to use, QUBELL_ORGANIZATION by default
+      --help               Show this message and exit.
+    
+    Commands:
+      create-org
+      export-app
+      import-app
+      list-apps
+      init-ca
+      
+Exporting also can handle dependent submodules, allowing you to download all 
+manifest dependencies:
+
+    $ python -mqubell.cli --organization 'ATGTestCase' export-app --output-dir ATG --recursive ATG-Starter-Kit
+    Saving ATG-Starter-Kit v22 => ATG/ATG-Starter-Kit-v22.yml OK
+    Saving Database v7 => ATG/Database-v7.yml OK
+    Saving Application Server v4 => ATG/Application Server-v4.yml OK
+    $
+    $ python -mqubell.cli create-org TestExport
+    TestExport 563c65b2e4b0d565ed1a63ca
+    $
+    $ python -mqubell.cli --organization TestExport import-app ATG/*
+    Importing ATG/ATG-Starter-Kit-v22.yml => ATG-Starter-Kit 563c65e0e4b081eaa2289fce OK
+    Importing ATG/Application Server-v4.yml => Application Server 563c65e1e4b081eaa2289fd1 OK
+    Importing ATG/Database-v7.yml => Database 563c65e3e4b081eaa2289fd4 OK
+        
+                                
 Running tests
 =============
 
 Run single test:
-  nosetests -s -v stories.instance.test_actions:BasicInstanceActionsTest.test_workflow_launch
+  
+    nosetests -s -v stories.instance.test_actions:BasicInstanceActionsTest.test_workflow_launch
 
 Run all tests in folder:
-  nosetests -s -v tests
+  
+    nosetests -s -v tests
 
 or
 
-  cd tests
-  nosetests
+    cd tests
+    nosetests
 
 
 
@@ -64,39 +107,39 @@ Simple way to create sandbox (see ./contrib-python-qubell-client/sandbox/):
 Create file containing organization structure, for example:
 
 
-organizations:
-- name: DEFAULT_ORG
-  applications:
-  - name: super_parent
-    file: ./super_parent.yml
-  - name: middle_child
-    file: ./middle_child.yml
-  - name: child
-    file: ./child.yml
-
-  environments:
-  - name: default
-    services:
-    - name: Default credentials service
-    - name: Default workflow service
-    - name: child-service
-
-  services:
-  - name: Default workflow service
-    type: builtin:workflow_service
-  - name: Default credentials service
-    type: builtin:cobalt_secure_store
-  - name: child-service
-    application: child
-
-  instances:
-  - name: test-instance
-    application: super_parent
+    organizations:
+    - name: DEFAULT_ORG
+      applications:
+      - name: super_parent
+        file: ./super_parent.yml
+      - name: middle_child
+        file: ./middle_child.yml
+      - name: child
+        file: ./child.yml
+    
+      environments:
+      - name: default
+        services:
+        - name: Default credentials service
+        - name: Default workflow service
+        - name: child-service
+    
+      services:
+      - name: Default workflow service
+        type: builtin:workflow_service
+      - name: Default credentials service
+        type: builtin:cobalt_secure_store
+      - name: child-service
+        application: child
+    
+      instances:
+      - name: test-instance
+        application: super_parent
 
 
 Now you can create organization, running:
 
-./restore_env.py default.env
+    ./restore_env.py default.env
 
 
 After, you will have fully configured organization, even with running instances. This example shows how to describe 3-level hearchical application, where child instance launched as service.
@@ -108,102 +151,102 @@ Coding your own scripts
 
 First way of creating sandbox, using restore method:
 
-config = {'organizations': [{'name': 'DEFAULT_ORG',
-                    'applications': [{'file': './super_parent.yml',
-                                      'name': 'super_parent'},
-                                     {'file': './middle_child.yml',
-                                      'name': 'middle_child'},
-                                     {'file': './child.yml',
-                                      'name': 'child'}],
-                    'environments': [{'name': 'default',
-                                      'services': [{'name': 'Default credentials service'},
-                                                   {'name': 'Default workflow service'},
-                                                   {'name': 'child-service'}]}],
-                    'instances': [{'application': 'super_parent',
-                                   'name': 'test-instance'}],
-                    'providers': [{'ec2SecurityGroup': 'default',
-                                   'jcloudsCredential': 'AAAAAAAAA',
-                                   'jcloudsIdentity': 'BBBBBBBBBBB',
-                                   'jcloudsRegions': 'us-east-1',
-                                   'name': 'generated-provider-for-tests',
-                                   'provider': 'aws-ec2',
-                                   'providerCopy': 'aws-ec2'}],
-                    'services': [{'name': 'Default workflow service',
-                                  'type': 'builtin:workflow_service'},
-                                 {'name': 'Default credentials service',
-                                  'type': 'builtin:cobalt_secure_store'},
-                                 {'application': 'child',
-                                  'name': 'child-service'}]}]}
+    config = {'organizations': [{'name': 'DEFAULT_ORG',
+                        'applications': [{'file': './super_parent.yml',
+                                          'name': 'super_parent'},
+                                         {'file': './middle_child.yml',
+                                          'name': 'middle_child'},
+                                         {'file': './child.yml',
+                                          'name': 'child'}],
+                        'environments': [{'name': 'default',
+                                          'services': [{'name': 'Default credentials service'},
+                                                       {'name': 'Default workflow service'},
+                                                       {'name': 'child-service'}]}],
+                        'instances': [{'application': 'super_parent',
+                                       'name': 'test-instance'}],
+                        'providers': [{'ec2SecurityGroup': 'default',
+                                       'jcloudsCredential': 'AAAAAAAAA',
+                                       'jcloudsIdentity': 'BBBBBBBBBBB',
+                                       'jcloudsRegions': 'us-east-1',
+                                       'name': 'generated-provider-for-tests',
+                                       'provider': 'aws-ec2',
+                                       'providerCopy': 'aws-ec2'}],
+                        'services': [{'name': 'Default workflow service',
+                                      'type': 'builtin:workflow_service'},
+                                     {'name': 'Default credentials service',
+                                      'type': 'builtin:cobalt_secure_store'},
+                                     {'application': 'child',
+                                      'name': 'child-service'}]}]}
+    
+    
+    from qubell.api.private.platform import QubellPlatform
+    from qubell.api.globals import QUBELL
+    
+    platform = QubellPlatform.connect(user=QUBELL['user'], password=QUBELL['password'], tenant=QUBELL['tenant'])
+    platform.restore(config)
 
-
-from qubell.api.private.platform import QubellPlatform
-from qubell.api.globals import QUBELL
-
-platform = QubellPlatform.connect(user=QUBELL['user'], password=QUBELL['password'], tenant=QUBELL['tenant'])
-platform.restore(config)
-
-# Let's check what we've got
-print platform.organizations['DEFAULT_ORG'].name
-for ins in platform.organizations['DEFAULT_ORG'].instances:
-    print ins.name
+    # Let's check what we've got
+    print platform.organizations['DEFAULT_ORG'].name
+    for ins in platform.organizations['DEFAULT_ORG'].instances:
+        print ins.name
 
 
 Second way, using get/create methods:
 
-from qubell.api.private.platform import QubellPlatform
-from qubell.api.private.manifest import Manifest
-from qubell.api.globals import QUBELL, PROVIDER_CONFIG, DEFAULT_WORKFLOW_SERVICE, DEFAULT_CREDENTIAL_SERVICE, DEFAULT_CLOUD_ACCOUNT_SERVICE
-from qubell.api.private.service import CLOUD_ACCOUNT_TYPE, WORKFLOW_SERVICE_TYPE, COBALT_SECURE_STORE_TYPE
+    from qubell.api.private.platform import QubellPlatform
+    from qubell.api.private.manifest import Manifest
+    from qubell.api.globals import QUBELL, PROVIDER_CONFIG, DEFAULT_WORKFLOW_SERVICE, DEFAULT_CREDENTIAL_SERVICE, DEFAULT_CLOUD_ACCOUNT_SERVICE
+    from qubell.api.private.service import CLOUD_ACCOUNT_TYPE, WORKFLOW_SERVICE_TYPE, COBALT_SECURE_STORE_TYPE
 
-# Connect to platform
-platform = QubellPlatform.connect(user=QUBELL['user'], password=QUBELL['password'], tenant=QUBELL['tenant'])
-
-##### Organization
-org = platform.organization(name='DEFAULT_ORG')
-# After executing this code, organization "DEFAULT_ORG" would be created (if not exists) or initialized (if exists)
-
-##### Environment
-
-# Usually environment consists of cloud account, keystore service and workflow service. So, we need to add these services to our organization, then add them to our environment:
-
-def prepare_env(org):
-
-    # Add services to organization
-    key_service = org.service(type=COBALT_SECURE_STORE_TYPE, name=DEFAULT_CREDENTIAL_SERVICE())
-    wf_service = org.service(type=WORKFLOW_SERVICE_TYPE, name=DEFAULT_WORKFLOW_SERVICE())
-    cloud_account = org.service(type=CLOUD_ACCOUNT_TYPE, name=DEFAULT_CLOUD_ACCOUNT_SERVICE(), parameters=PROVIDER_CONFIG)
-
-    # Add services to environment
-    env = org.environment(name='new-environment')
-    env.clean()
-    env.add_service(key_service)
-    env.add_service(wf_service)
-    env.add_service(cloud_account)
-
-    # Here we regenerate keypair
-    env.add_policy(
-        {"action": "provisionVms",
-         "parameter": "publicKeyId",
-         "value": key_service.regenerate()['id']})
-    return env
-
-environment = prepare_env(org)
-
-# Now, platform ready to be used. We need only application with valid manifest.
-
-##### Application
-# We need manifest to create application::
-
-manifest = Manifest(url='https://raw.githubusercontent.com/qubell/contrib-python-qubell-client/master/sandbox/child.yml')
-
-# Creating application
-app = org.application(manifest=manifest, name='first_app')
-
-# Application will be created.
-# Let's start instance using in env1 :
-
-instance = org.create_instance(application=app, environment=environment)
-
-# This way we wait instance to came up in 15 minutes or break.
-assert instance.ready(15)
-print instance.return_values['child_out.child_output']
+    # Connect to platform
+    platform = QubellPlatform.connect(user=QUBELL['user'], password=QUBELL['password'], tenant=QUBELL['tenant'])
+    
+    ##### Organization
+    org = platform.organization(name='DEFAULT_ORG')
+    # After executing this code, organization "DEFAULT_ORG" would be created (if not exists) or initialized (if exists)
+    
+    ##### Environment
+    
+    # Usually environment consists of cloud account, keystore service and workflow service. So, we need to add these services to our organization, then add them to our environment:
+    
+    def prepare_env(org):
+    
+        # Add services to organization
+        key_service = org.service(type=COBALT_SECURE_STORE_TYPE, name=DEFAULT_CREDENTIAL_SERVICE())
+        wf_service = org.service(type=WORKFLOW_SERVICE_TYPE, name=DEFAULT_WORKFLOW_SERVICE())
+        cloud_account = org.service(type=CLOUD_ACCOUNT_TYPE, name=DEFAULT_CLOUD_ACCOUNT_SERVICE(), parameters=PROVIDER_CONFIG)
+    
+        # Add services to environment
+        env = org.environment(name='new-environment')
+        env.clean()
+        env.add_service(key_service)
+        env.add_service(wf_service)
+        env.add_service(cloud_account)
+    
+        # Here we regenerate keypair
+        env.add_policy(
+            {"action": "provisionVms",
+             "parameter": "publicKeyId",
+             "value": key_service.regenerate()['id']})
+        return env
+    
+    environment = prepare_env(org)
+    
+    # Now, platform ready to be used. We need only application with valid manifest.
+    
+    ##### Application
+    # We need manifest to create application::
+    
+    manifest = Manifest(url='https://raw.githubusercontent.com/qubell/contrib-python-qubell-client/master/sandbox/child.yml')
+    
+    # Creating application
+    app = org.application(manifest=manifest, name='first_app')
+    
+    # Application will be created.
+    # Let's start instance using in env1 :
+    
+    instance = org.create_instance(application=app, environment=environment)
+    
+    # This way we wait instance to came up in 15 minutes or break.
+    assert instance.ready(15)
+    print instance.return_values['child_out.child_output']

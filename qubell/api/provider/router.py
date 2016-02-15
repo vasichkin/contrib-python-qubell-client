@@ -125,6 +125,10 @@ class PrivatePath(Router):
     @route("GET /organizations/{org_id}/applications/{app_id}/manifests/latest{ctype}")
     def get_application_manifests_latest(self, org_id, app_id, cookies, ctype=".json"): pass
 
+    @play_auth
+    @route("GET /organizations/{org_id}/applications/{app_id}/manifests/{version}{ctype}")
+    def get_application_manifest_version(self, org_id, app_id, cookies, version, ctype=".json"): pass
+
     #Revision
     @play_auth
     @route("POST /organizations/{org_id}/applications/{app_id}/createRevision{ctype}")
