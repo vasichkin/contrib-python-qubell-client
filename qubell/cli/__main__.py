@@ -21,7 +21,13 @@ from qubell.cli.yamlutils import DuplicateAnchorLoader
 
 
 PROVIDER_CONFIG = None
-
+CMD_LIST=['instance',
+          'application',
+          'environment',
+          'organization',
+          'platform',
+          'zone',
+          'manifest',]
 
 log.getLogger().setLevel(getattr(log, os.getenv('QUBELL_LOG_LEVEL', 'error').upper()))
 
@@ -29,9 +35,9 @@ log.getLogger().setLevel(getattr(log, os.getenv('QUBELL_LOG_LEVEL', 'error').upp
 STATUS_COLORS = {
     "ACTIVE": "GREEN",
     "RUNNING": "GREEN",
-    "LAUNCHING": "BLUE",
-    "DESTROYING": "BLUE",
-    "EXECUTING": "BLUE",
+    "LAUNCHING": "CYAN",
+    "DESTROYING": "CYAN",
+    "EXECUTING": "CYAN",
     "FAILED": "RED",
     "ERROR": "RED",
     "DESTROYED": "LIGHTBLACK_EX",
@@ -70,6 +76,35 @@ def _map_opt(value_or_none, function):
     else:
         return function(value_or_none)
 
+@click.group()
+def platform_cli():
+    pass
+
+@click.group()
+def zone_cli():
+    pass
+
+@click.group()
+def organization_cli():
+    pass
+
+@click.group()
+def application_cli():
+    pass
+
+@click.group()
+def environment_cli():
+    pass
+
+@click.group()
+def instance_cli():
+    pass
+
+@click.group()
+def manifest_cli():
+    pass
+
+
 
 @click.group()
 @click.option("--tenant", default="", help="Tenant url to use, QUBELL_TENANT by default")
@@ -77,7 +112,8 @@ def _map_opt(value_or_none, function):
 @click.option("--password", default="", help="Password to use, QUBELL_PASSWORD by default")
 @click.option("--organization", default="", help="Organization to use, QUBELL_ORGANIZATION by default")
 @click.option("--debug/--no-debug", default=False, help="Debug mode, also QUBELL_LOG_LEVEL can be used.")
-def cli(debug, **kwargs):
+@click.pass_context
+def entity(ctx, debug, **kwargs):
     """
     CLI for tonomi.com using contrib-python-qubell-client
 
@@ -118,16 +154,56 @@ def cli(debug, **kwargs):
     ctx = click.get_current_context()
     ctx.obj = UserContext()
 
+def list_commands(ctx):
+    return CMD_LIST
+
+def get_command(ctx, name):
+    if 'man' in name:
+        return manifest_cli
+    elif 'ins' in name:
+        return instance_cli
+    elif 'app' in name:
+        return application_cli
+    elif 'env' in name:
+        return environment_cli
+    elif 'org' in name:
+        return organization_cli
+    elif 'zon' in name:
+        return zone_cli
+    elif 'pla' in name:
+        return platform_cli
+
+entity.list_commands=list_commands
+entity.get_command=get_command
+
+
 
 def _get_platform():
     return click.get_current_context().obj.get_platform()
 
+def _color(color, text):
+    if not isinstance(text, basestring):
+        text = str(text)
+    return getattr(Fore, color) + text + Style.RESET_ALL
 
-@cli.command(name="list-apps")
-@click.option("--verbose/--quiet", default=False, help="Verbose output")
+def _print_message(message, color="BLACK"):
+    if "message" in message:
+        click.echo(_color(color, message["message"]))
+    elif isinstance(message, basestring):
+        click.echo(_color(color, message))
+    else:
+        click.echo(_color(color, "<error format not supported by this version of cli>"))
+
+##############################################################################
+###############################  APPLICATION  ###############################
+##############################################################################
+
+@application_cli.command(name="list", help="List applications in organization")
+@click.option('-v', '--verbose', is_flag=True, default=False, help="Verbose output")
 def list_apps(verbose):
     _platform = _get_platform()
 
+    assert QUBELL["organization"], "Organization should be provided"
     org = _platform.get_organization(QUBELL["organization"])
     for app in org.applications:
         if verbose:
@@ -145,20 +221,13 @@ def list_apps(verbose):
         else:
             click.echo(app.id + " " + _color("BLUE", app.name))
 
-
-def _color(color, text):
-    if not isinstance(text, basestring):
-        text = str(text)
-    return getattr(Fore, color) + text + Style.RESET_ALL
-
-
-@cli.command(name="export-app")
-@click.option("--recursive/--non-recursive", default=False, help="Export also dependencies.")
-@click.option("--output-dir", default="", help="Output directory for manifest files, current by default.")
-@click.option("--stdout/--file", default=False, help="Print manifest to stdin instead of saving to file")
-@click.option("--version", default=None, help="Manifest version to export.")
-@click.argument("application")
-def export_app(recursive, application, output_dir, version, stdout):
+@application_cli.command(name="export", help="Save manifest of applications to files")
+@click.argument("applications", nargs=-1)
+@click.option("--recursive", is_flag=True, default=False, help="Recursively also dependencies")
+@click.option("--output-dir", default="", help="Output directory for manifest files, current by default")
+@click.option("--stdout", default=False, help="Print manifest to stdout instead of saving to file")
+@click.option("--version", '-v', default=None, help="Manifest version to export. Default is last available")
+def export_app(recursive, applications, output_dir, version, stdout):
     if stdout and recursive:
         click.echo("Using --recursive with --stdout is not supported")
         exit(1)
@@ -218,21 +287,23 @@ def export_app(recursive, application, output_dir, version, stdout):
         except (IOError, NotFoundError):
             click.echo(_color("RED", " FAIL"))
 
-    do_export(application, version)
+    assert applications, "Application ID or name should be provided"
+    for app in applications:
+        do_export(app, version)
 
 
-@cli.command(name="import-app")
+@application_cli.command(name="import", help="Upload manifest to application. If no name or id provided, application will be created by file name")
+@click.argument("files", nargs=-1)
 @click.option("--category", default=None, help="Category name in which app will be created. "
                                                "If app already exists, its category will be updated.")
-@click.option("--app-id", default=None,
+@click.option("--id", "-i", default=None,
               help="Application id, allowed only if one filename given. Disables --app-name if provided."
                    "If app with such id not found, new app won't be created.")
-@click.option("--app-name", default=None,
+@click.option("--name", "-n", default=None,
               help="Application name, allowed only if one filename given. Is ignored if --app-id is provided."
                    "Has higher priority than file name.")
-@click.option("--overwrite/--no-overwrite", default=False, help="Upload manifest for already existing applications")
-@click.argument("filenames", nargs=-1)
-def import_app(filenames, category, overwrite, app_id, app_name):
+@click.option("--overwrite", "-w", is_flag=True, default=False, help="Upload manifest for already existing applications")
+def import_app(files, category, overwrite, id, name):
     """ Upload application from file.
 
     By default, file name will be used as application name, with "-vXX.YYY" suffix stripped.
@@ -248,30 +319,31 @@ def import_app(filenames, category, overwrite, app_id, app_name):
     if category:
         category = org.categories[category]
     regex = re.compile(r"^(.*?)(-v(\d+)|)\.[^.]+$")
-    if (app_id or app_name) and len(filenames) > 1:
-        raise Exception("--app-id and --app-name are supported only for single-file mode")
-    for filename in filenames:
+    if (id or name) and len(files) > 1:
+        raise Exception("--id and --name are supported only for single-file mode")
+
+    for filename in files:
         click.echo("Importing " + filename, nl=False)
-        if not app_name:
+        if not name:
             match = regex.match(basename(filename))
             if not match:
                 click.echo(_color("RED", "FAIL") + " unknown filename format")
                 break
-            app_name = regex.match(basename(filename)).group(1)
+            name = regex.match(basename(filename)).group(1)
         click.echo(" => ", nl=False)
         app = None
         try:
-            app = org.get_application(id=app_id, name=app_name)
+            app = org.get_application(id=id, name=name)
             if app and not overwrite:
                 click.echo("%s %s already exists %s" % (
-                    app.id, _color("BLUE", app and app.name or app_name), _color("RED", "FAIL")))
+                    app.id, _color("BLUE", app and app.name or name), _color("RED", "FAIL")))
                 break
         except NotFoundError:
-            if app_id:
+            if id:
                 click.echo("%s %s not found %s" % (
-                    app_id or "", _color("BLUE", app and app.name or app_name), _color("RED", "FAIL")))
+                    id or "", _color("BLUE", app and app.name or name), _color("RED", "FAIL")))
                 break
-        click.echo(_color("BLUE", app and app.name or app_name) + " ", nl=False)
+        click.echo(_color("BLUE", app and app.name or name) + " ", nl=False)
         try:
             with file(filename, "r") as f:
                 if app:
@@ -279,7 +351,7 @@ def import_app(filenames, category, overwrite, app_id, app_name):
                                category=category and category.id or app.category,
                                manifest=Manifest(content=f.read()))
                 else:
-                    app = org.application(id=app_id, name=app_name, manifest=Manifest(content=f.read()))
+                    app = org.application(id=id, name=name, manifest=Manifest(content=f.read()))
                     if category:
                         app.update(category=category.id)
             click.echo(app.id + _color("GREEN", " OK"))
@@ -288,18 +360,21 @@ def import_app(filenames, category, overwrite, app_id, app_name):
             break
 
 
-@cli.command(name="delete-app")
-@click.argument("application", nargs=-1)
-def delete_app(application):
+@application_cli.command(name="delete", help="Delete application")
+@click.argument("applications", nargs=-1)
+def delete_app(applications):
     platform = _get_platform()
     org = platform.get_organization(QUBELL["organization"])
-    for app in application:
+    for app in applications:
         click.echo("Deleting %s" % (_color("BLUE", app)), nl=False)
         org.delete_application(app)
         click.echo(_color("GREEN", " OK"))
 
+##############################################################################
+###############################  ORGANIZATION  ###############################
+##############################################################################
 
-@cli.command(name="create-org")
+@organization_cli.command(name="create", help="Create organization")
 @click.argument("organization")
 def create_org(organization):
     platform = _get_platform()
@@ -317,8 +392,8 @@ def create_org(organization):
             org = platform.get_organization(organization)
             click.echo(_color("YELLOW", org.id) + " still initializing")
 
-
-@cli.command(name="init-ca")
+# TODO: Dup of env.init ??
+@organization_cli.command(name="init", help="Initialize cloud account service")
 @click.option("--type", default="", help="Provider name (for example, aws-ec2, openstack, etc)")
 @click.option("--identity", default="", help="Provider identity or login, PROVIDER_IDENTITY by default")
 @click.option("--credential", default="",
@@ -351,7 +426,14 @@ def init_ca(account_name, environment, **kwargs):
         click.echo(_color("RED", "FAILED"))
 
 
-@cli.command(name="restore-env")
+@organization_cli.command("list", help="List organizations")
+def list_orgs():
+    platform = _get_platform()
+    for app in platform.organizations:
+        click.echo(app.id + " " + _color("BLUE", app.name))
+
+
+@organization_cli.command(name="restore", help="Restore configuration from ENV file")
 @click.argument("environment")
 def restore_env(environment):
     platform = _get_platform()
@@ -372,32 +454,16 @@ def restore_env(environment):
         log.error("Failed to restore env", exc_info=e)
 
 
-@cli.command("list-orgs")
-def list_orgs():
-    platform = _get_platform()
-    for app in platform.organizations:
-        click.echo(app.id + " " + _color("BLUE", app.name))
+##############################################################################
+###############################  INSTANCE  ###############################
+##############################################################################
 
-
-@cli.command("list-envs")
-def list_envs():
-    platform = _get_platform()
-    org = platform.get_organization(QUBELL["organization"])
-    for env in org.environments:
-        status = env.isOnline and _color("GREEN", "ONLINE") or _color("RED", "FAILED")
-        click.echo(env.id + " " + _color("BLUE", env.name) + " " + status, nl=False)
-        if env.isDefault:
-            click.echo(" " + _color("BLUE", "DEFAULT"))
-        else:
-            click.echo()
-
-
-@cli.command("list-instances")
+@instance_cli.command("list", help="List instances in current organization or application")
+@click.argument("application", default=None, required=False)
 @click.option("--status", default="!DESTROYED",
               help="Filter by statuses, one of "
                    "REQUESTED, LAUNCHING, ACTIVE, EXECUTING, FAILED, DESTROYING, DESTROYED."
                    "Several statuses can be listed using comma. !STATUS_NAME to invert match.")
-@click.argument("application", default=None, required=False)
 def list_instances(application, status):
     platform = _get_platform()
     org = platform.get_organization(QUBELL["organization"])
@@ -439,7 +505,7 @@ def _describe_instance_short(inst):
                _color(STATUS_COLORS.get(inst.status.upper(), "BLACK"), inst.status.upper()))
 
 
-@cli.command("describe-instance")
+@instance_cli.command("describe", help="Show details about instance")
 @click.argument("instance")
 def describe_instance(instance, localtime=True):
     platform = _get_platform()
@@ -513,7 +579,7 @@ def _describe_submodules(path, submodules, level):
         _describe_submodules(module_path, submodule.get("submodules", []), level + 1)
 
 
-@cli.command("launch-instance")
+@instance_cli.command("launch", help="Launch instance in application")
 @click.option("--revision", default=None, help="Revision to launch")
 @click.option("--environment", default=None, help="Environment used to launch instance")
 @click.option("--destroy", default=None, help="Schedule destroy (seconds)")
@@ -552,7 +618,7 @@ def launch_instance(revision, environment, destroy, application, name, parameter
     _describe_instance(inst, True)
 
 
-@cli.command("show-parameters")
+@instance_cli.command("parameters", help="Get default launch parameters for application")
 @click.argument("application")
 def show_instance_parameters(application):
     platform = _get_platform()
@@ -585,7 +651,7 @@ def show_instance_parameters(application):
     _render_parameters("", params.get("componentTree", {}))
 
 
-@cli.command("destroy-instance")
+@instance_cli.command("destroy", help="Destroy instance")
 @click.option("--wait/--no-wait", default=False, help="Wait for DESTROYED status")
 @click.option("--timeout", default=3, type=int, help="Timeout in minutes")
 @click.argument("instance")
@@ -600,9 +666,9 @@ def destroy_instance(instance, timeout, wait):
         _describe_instance_short(inst)
 
 
-@cli.command("wait-status")
+@instance_cli.command("wait-status", help="Wait until instance status becomes 'Status' or timeout reached")
 @click.option("--timeout", default=3, type=int, help="Timeout in minutes")
-@click.option("--status", default="Active",
+@click.option("--status", "-s", default="Active",
               help="Status to wait (Requested, Launching, Active, Executing, Destroying, Destroyed, Unknown)")
 @click.argument("instance")
 def wait_status(instance, status, timeout):
@@ -618,8 +684,8 @@ def wait_status(instance, status, timeout):
         _describe_instance_short(org.get_instance(instance))
 
 
-@cli.command("remove-instance")
-@click.option("--force/--no-force", default=False, help="Wait for DESTROYED status")
+@instance_cli.command("remove", help="Force remove instance")
+@click.option("--force", is_flag=True, default=False, help="Wait for DESTROYED status")
 @click.argument("instance")
 def destroy_instance(instance, force):
     platform = _get_platform()
@@ -655,17 +721,17 @@ def _parse_timestamp(datetime, localtime=False):
     return time.mktime(time_t) + time_shift
 
 
-@cli.command("show-instance-logs")
+@instance_cli.command("logs")
 @click.option("--severity", default="INFO", help="Logs severity.")
 @click.option("--localtime/--utctime", default=True, help="Use local or UTC time.")
 @click.option("--sort-by", default="time",
               help="Sort by time/severity/source/eventTypeText/description. Prefix with minus for inverted order.")
-@click.option("--hide-multiline/--multiline", default=True, help="Show only first line of multi-line message")
+@click.option("--hide-multiline", is_flag=True, default=True, help="Show only first line of multi-line message")
 @click.option("--filter-text", default=None, help="Filter by full text, including source and event name")
 @click.option("--max-items", default=30,
               help="Limit number of items to show. Positive integer for tail, negative integer for head.")
-@click.option("--follow/--no-follow", default=False, help="Wait for new messages to appear.")
-@click.option("--show-all/--no-show-all", default=False, help="Show all messages, overrides --max-items.")
+@click.option("--follow", is_flag=True,default=False, help="Wait for new messages to appear.")
+@click.option("--show-all", is_flag=True, default=False, help="Show all messages, overrides --max-items.")
 @click.option("--before", default=None, help="Show messages before TIMESTAMP")
 @click.option("--after", default=None, help="Show messages after TIMESTAMP")
 @click.argument("instance")
@@ -744,8 +810,24 @@ def show_logs(instance, localtime, severity, sort_by, hide_multiline, filter_tex
         else:
             break
 
+##############################################################################
+###############################  ENVIRONMENT  ###############################
+##############################################################################
 
-@cli.command("clear-env")
+
+@environment_cli.command("list", help="List environments")
+def list_envs():
+    platform = _get_platform()
+    org = platform.get_organization(QUBELL["organization"])
+    for env in org.environments:
+        status = env.isOnline and _color("GREEN", "ONLINE") or _color("RED", "FAILED")
+        click.echo(env.id + " " + _color("BLUE", env.name) + " " + status, nl=False)
+        if env.isDefault:
+            click.echo(" " + _color("BLUE", "DEFAULT"))
+        else:
+            click.echo()
+
+@environment_cli.command("clear", help="Clean environment. Remove all services in environment")
 @click.option("--destroy-services/--keep-services", default=False, help="Destroy services")
 @click.option("--fallback-force/--no-fallback-force", default=False, help="Use force-remove if destroy failed")
 @click.option("--force/--no-force", default=False, help="Use force-remove instead of destroy")
@@ -773,39 +855,38 @@ def clear_env(environment, destroy_services, force, fallback_force):
     click.echo(_color("GREEN", "CLEANED"))
 
 
-@cli.command("init-env")
+@environment_cli.command("init", help="Add basic services to environment (WF, CA, KS services)")
 @click.option("--zone", default=None, help="In what zone services should be launched")
-@click.option("--with-cloud-account/--without-cloud-account", default=True, help="Whether init-ca should be performed")
-@click.argument("environment")
-def init_env(environment, with_cloud_account, zone):
+@click.option("--without-cloud-account", is_flag=True, default=True, help="Whether init-ca should be performed")
+@click.argument("environment", default="default")
+def init_env(environment, without_cloud_account, zone):
     platform = _get_platform()
     org = platform.get_organization(QUBELL["organization"])
     env = org.get_environment(environment)
     click.echo(env.id + " " + _color("BLUE", env.name) + " ", nl=False)
-    env.init_common_services(with_cloud_account=with_cloud_account, zone_name=zone)
+    env.init_common_services(with_cloud_account=not(without_cloud_account), zone_name=zone)
     click.echo(_color("GREEN", "OK"))
 
 
-@cli.command("create-env")
+@environment_cli.command("create", help="Create environment")
 @click.option("--default/--no-default", default=False, help="Make created environment default")
 @click.option("--zone", default=None, help="Zone for environment. "
                                            "When performing init-env, services will be launched in that zone")
-@click.option("--init/--no-init", default=False, help="Perform init-env after creation")
-@click.option("--with-cloud-account/--without-cloud-account", default=True,
+@click.option("--init", is_flag=True, default=False, help="Perform init-env after creation")
+@click.option("--without-cloud-account", default=True,
               help="If performing init-env, whether init-ca should be performed")
 @click.argument("name")
-@click.pass_context
-def create_env(ctx, name, init, zone, default, with_cloud_account):
+def create_env(name, init, zone, default, without_cloud_account):
     platform = _get_platform()
     org = platform.get_organization(QUBELL["organization"])
     env = org.create_environment(name, default, zone)
     click.echo(env.id + " " + _color("BLUE", env.name) + " ", nl=False)
     if init:
-        env.init_common_services(with_cloud_account=with_cloud_account, zone_name=zone)
+        env.init_common_services(with_cloud_account=not(without_cloud_account), zone_name=zone)
     click.echo(_color("GREEN", "CREATED"))
 
 
-@cli.command("delete-env")
+@environment_cli.command("delete", help="Delete environment")
 @click.argument("environment")
 def delete_env(environment):
     platform = _get_platform()
@@ -816,18 +897,18 @@ def delete_env(environment):
     click.echo(_color("GREEN", "DELETED"))
 
 
-@cli.command("clone-env")
-@click.option("--wait/--no-wait", default=False, help="Wait for environment to become ONLINE")
+@environment_cli.command("clone", help="Copy environment")
+@click.option("--wait", is_flag=True, default=False, help="Wait for environment to become ONLINE")
 @click.option("--zone", default=None, help="Zone for environment")
 @click.argument("environment")
-@click.argument("name", default=None, required=False)
-def clone_env(environment, name, wait, zone):
+@click.argument("newname", default=None, required=False)
+def clone_env(environment, newname, wait, zone):
     platform = _get_platform()
     org = platform.get_organization(QUBELL["organization"])
     orig_env = org.get_environment(environment)
-    if not name:
-        name = orig_env.name + " clone"
-    env = org.create_environment(name, False, zone or orig_env.zoneId)
+    if not newname:
+        newname = "Clone of " + orig_env.name
+    env = org.create_environment(newname, False, zone or orig_env.zoneId)
     click.echo(env.id + " " + _color("BLUE", env.name) + " ", nl=False)
     env.restore(orig_env.json())
     if wait:
@@ -837,8 +918,8 @@ def clone_env(environment, name, wait, zone):
         click.echo(_color("GREEN", "CREATED"))
 
 
-@cli.command("describe-env")
-@click.argument("environment")
+@environment_cli.command("describe", help="Show services, markers and properties of environment")
+@click.argument("environment", default="default")
 def describe_env(environment):
     platform = _get_platform()
     org = platform.get_organization(QUBELL["organization"])
@@ -867,8 +948,8 @@ def describe_env(environment):
         _columns(env.properties, lambda s: "    %(type)s %(name)s" % s, lambda s: s['value'])
 
 
-@cli.command("export-env")
-@click.argument("environment")
+@environment_cli.command("export", help="Save environment to file")
+@click.argument("environment", default="default")
 @click.argument("filename", default=None, required=False)
 def export_env(environment, filename):
     platform = _get_platform()
@@ -883,14 +964,18 @@ def export_env(environment, filename):
     f.write(env.export_yaml())
 
 
-@cli.command("import-env")
-@click.option("--merge/--no-merge", default=True, help="Merge or replace file contents with existing environment.")
+@environment_cli.command("import", help="Import environment from file")
+@click.option("--merge", is_flag=True, default=True, help="Merge or replace file contents with existing environment.")
+@click.option("--create", is_flag=True, default=True, help="")
 @click.argument("environment")
 @click.argument("filename", default=None, required=False)
-def import_env(environment, filename, merge):
+def import_env(environment, filename, merge, create):
     platform = _get_platform()
     org = platform.get_organization(QUBELL["organization"])
-    env = org.get_environment(environment)
+    if create:
+        env = org.get_or_create_environment(environment)
+    else:
+        env = org.get_environment(environment)
     env_file = filename and open(filename, "r") or sys.stdin
     if not filename:
         filename = "stdin"
@@ -898,18 +983,8 @@ def import_env(environment, filename, merge):
     env.import_yaml(env_file, merge=merge)
     click.echo(_color("GREEN", "OK"))
 
-
-@cli.command("list-zones")
-def list_zones():
-    platform = _get_platform()
-    org = platform.get_organization(QUBELL["organization"])
-    _columns(org.list_zones_json(),
-             lambda o: o['id'],
-             lambda o: _color("BLUE", o['name']) + (o['isDefault'] and " DEFAULT" or ""))
-
-
-@cli.command("make-default")
-@click.argument("environment")
+@environment_cli.command("make-default")
+@click.argument("environment", default='default')
 def make_default(environment):
     platform = _get_platform()
     org = platform.get_organization(QUBELL["organization"])
@@ -918,17 +993,19 @@ def make_default(environment):
     env.set_as_default()
     click.echo(_color("GREEN", "DEFAULT"))
 
+##############################################################################
+###############################  OTHER  ######################################
+##############################################################################
 
-def _print_message(message, color="BLACK"):
-    if "message" in message:
-        click.echo(_color(color, message["message"]))
-    elif isinstance(message, basestring):
-        click.echo(_color(color, message))
-    else:
-        click.echo(_color(color, "<error format not supported by this version of cli>"))
+@zone_cli.command("list")
+def list_zones():
+    platform = _get_platform()
+    org = platform.get_organization(QUBELL["organization"])
+    _columns(org.list_zones_json(),
+             lambda o: o['id'],
+             lambda o: _color("BLUE", o['name']) + (o['isDefault'] and " DEFAULT" or ""))
 
-
-@cli.command("validate-manifest")
+@manifest_cli.command("validate")
 @click.argument("filename", required=False, default=None)
 def validate_manifest(filename):
     platform = _get_platform()
@@ -948,7 +1025,7 @@ def validate_manifest(filename):
     exit(errors and 1 or 0)
 
 
-@cli.command("import-kit")
+@organization_cli.command("import-kit")
 @click.option("--category", default=None, help="Category of uploaded applications")
 @click.argument("metadata_url")
 def import_kit(metadata_url, category):
@@ -979,7 +1056,7 @@ REVERSE_PROVIDER_MAPPING = {
 }
 
 
-@cli.command("show-account")
+@platform_cli.command("show-account")
 def show_account():
     """
     Exports current account configuration in
@@ -1000,4 +1077,4 @@ def show_account():
 
 
 if __name__ == '__main__':
-    cli()
+    entity(obj={})
