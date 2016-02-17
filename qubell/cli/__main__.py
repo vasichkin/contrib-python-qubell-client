@@ -158,19 +158,19 @@ def list_commands(ctx):
     return CMD_LIST
 
 def get_command(ctx, name):
-    if 'man' in name:
+    if name.startswith('man'):
         return manifest_cli
-    elif 'ins' in name:
+    elif name.startswith('ins'):
         return instance_cli
-    elif 'app' in name:
+    elif name.startswith('app'):
         return application_cli
-    elif 'env' in name:
+    elif name.startswith('env'):
         return environment_cli
-    elif 'org' in name:
+    elif name.startswith('org'):
         return organization_cli
-    elif 'zon' in name:
+    elif name.startswith('zone'):
         return zone_cli
-    elif 'pla' in name:
+    elif name.startswith('pla'):
         return platform_cli
 
 entity.list_commands=list_commands
@@ -205,8 +205,11 @@ def list_apps(verbose):
 
     assert QUBELL["organization"], "Organization should be provided"
     org = _platform.get_organization(QUBELL["organization"])
-    for app in org.applications:
+    json = org.list_applications_json()
+    for app_id, app_name in [(a['id'], a['name']) for a in json]:
+
         if verbose:
+            app = org.applications[app_name]
             instances = app.instances
             by_status = {}
             by_status['DESTROYED'] = len(app.destroyed_instances)
@@ -219,7 +222,7 @@ def list_apps(verbose):
                        "(%(ACTIVE)s/%(LAUNCHING)s/%(EXECUTING)s/%(DESTROYING)s/%(FAILED)s/%(DESTROYED)s) " % by_status +
                        _color("BLUE", app.name))
         else:
-            click.echo(app.id + " " + _color("BLUE", app.name))
+            click.echo(app_id + " " + _color("BLUE", app_name))
 
 @application_cli.command(name="export", help="Save manifest of applications to files")
 @click.argument("applications", nargs=-1)
