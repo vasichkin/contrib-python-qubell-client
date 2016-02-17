@@ -4,7 +4,7 @@ import os
 from setuptools import setup, find_packages
 here = os.path.abspath(os.path.dirname(__file__))
 
-with open('requirements.txt') as f:
+with open(os.path.join(here, 'requirements.txt')) as f:
     required = f.read().splitlines()
 
 test_requires = [
@@ -14,9 +14,9 @@ test_requires = [
     ]
 
 setup(name='qubell-api-python-client',
-      version='1.46.44.12',  # versionising: <major>.<minor>.<platform major>.<platform minor>
+      version='1.47.44.12',  # versionising: <major>.<minor>.<platform major>.<platform minor>
       description='Qubell platform client library',
-      long_description=open('README').read(),
+      long_description=open(os.path.join(here,'README')).read(),
       author='Vasyl Khomenko',
       author_email='vkhomenko@qubell.com',
       license=open('LICENSE').read(),
