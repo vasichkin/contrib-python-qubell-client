@@ -116,7 +116,8 @@ class Environment(Entity, InstanceRouter):
 
     def set_as_default(self):
         data = json.dumps({'environmentId': self.id})
-        return self._router.put_organization_default_environment(org_id=self.organizationId, data=data).json()
+        return self._router.put_organization_default_environment(env_id=self.id, org_id=self.organizationId,
+                                                                 data=data).json()
 
     def list_available_services_json(self):
         return self._router.get_environment_available_services(org_id=self.organizationId,
@@ -189,10 +190,15 @@ class Environment(Entity, InstanceRouter):
 
     # noinspection PyShadowingBuiltins
     def import_yaml(self, file, merge=False):
-        assert os.path.exists(file)
         data = {"merge": merge}
-        files = {'path': ("filename", open(file))}
+        if isinstance(file, basestring):
+            assert os.path.exists(file)
+            file = open(file)
+        files = {'path': ("filename", file)}
         self._router.post_env_import(org_id=self.organizationId, env_id=self.environmentId, data=data, files=files)
+
+    def export_yaml(self):
+        return self._router.get_env_export(org_id=self.organizationId, env_id=self.environmentId).text
 
     def __bulk_update(self, env_operations):
 
