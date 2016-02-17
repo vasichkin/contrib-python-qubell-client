@@ -138,6 +138,9 @@ class QubellPlatform(InstanceRouter):
             restored_org = self.get_or_create_organization(id=org.get('id'), name=org.get('name'))
             restored_org.restore(org, clean, timeout)
 
+    def validate(self, manifest):
+        return self._router.post_validate(data=manifest.content).json()
+
     # noinspection PyMethodMayBeStatic
     def authenticate(self):
         assert False, 'use QubellPlatform.connect instead'

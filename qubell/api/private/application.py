@@ -208,3 +208,4 @@ class Application(Entity, InstanceRouter):
 
 class ApplicationList(QubellEntityList):
     base_clz = Application
+

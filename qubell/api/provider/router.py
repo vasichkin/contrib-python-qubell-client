@@ -67,6 +67,10 @@ class PrivatePath(Router):
     @route("GET /404")
     def get_404(self): pass
 
+    @play_auth
+    @route("POST /validate{ctype}")
+    def post_validate(self, data, cookies, ctype=".json", content_type="yaml"): pass
+
     #Organization
     @play_auth
     @route("POST /organizations{ctype}")
@@ -91,6 +95,10 @@ class PrivatePath(Router):
     @play_auth
     @route("POST /organizations/{org_id}/applications/{app_id}/launch{ctype}")
     def post_organization_instance(self, org_id, app_id, data, cookies, ctype=".json"): pass
+
+    @play_auth
+    @route("POST /organizations/{org_id}/applications/{app_id}/launchParameters{ctype}")
+    def post_organization_launch_parameters(self, org_id, app_id, cookies, data="{}", ctype=".json"): pass
 
     @play_auth
     @route("POST /organizations/{org_id}/environments{ctype}")
@@ -243,6 +251,10 @@ class PrivatePath(Router):
     @play_auth
     @route("POST /organizations/{org_id}/environments/{env_id}/import{ctype}")
     def post_env_import(self, org_id, env_id, cookies, data="{}", files="{}", ctype=".json"): pass
+
+    @play_auth
+    @route("GET /organizations/{org_id}/environments/{env_id}/export")
+    def get_env_export(self, org_id, env_id, cookies): pass
 
     #Zone
     @play_auth
