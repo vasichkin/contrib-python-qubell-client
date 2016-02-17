@@ -14,7 +14,7 @@ test_requires = [
     ]
 
 setup(name='qubell-api-python-client',
-      version='1.47.44.12',  # versionising: <major>.<minor>.<platform major>.<platform minor>
+      version='1.48.44.12',  # versionising: <major>.<minor>.<platform major>.<platform minor>
       description='Qubell platform client library',
       long_description=open(os.path.join(here,'README')).read(),
       author='Vasyl Khomenko',
@@ -22,7 +22,7 @@ setup(name='qubell-api-python-client',
       license=open('LICENSE').read(),
       url='https://github.com/qubell/contrib-python-qubell-client',
       packages=find_packages(exclude=['test_qubell_client', 'stories', 'integration_tests', 'integration_tests.testing']),
-      package_data={'': ['LICENSE', 'README', 'qubell/monitor/monitor_manifests/*']},
+      package_data={'': ['LICENSE', 'README', 'requirements.txt', 'qubell/monitor/monitor_manifests/*']},
       include_package_data=True,
       install_requires=required,
       tests_require=test_requires,
