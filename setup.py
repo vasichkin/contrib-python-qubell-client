@@ -3,9 +3,11 @@
 import os
 from setuptools import setup, find_packages
 here = os.path.abspath(os.path.dirname(__file__))
-
-with open(os.path.join(here, 'requirements.txt')) as f:
-    required = f.read().splitlines()
+requires = ['simplejson',
+            'pyaml',
+            'requests',
+            'click',
+            'colorama']
 
 test_requires = [
     'testtools',
@@ -14,7 +16,7 @@ test_requires = [
     ]
 
 setup(name='qubell-api-python-client',
-      version='1.48.44.12',  # versionising: <major>.<minor>.<platform major>.<platform minor>
+      version='1.51.44.12',  # versionising: <major>.<minor>.<platform major>.<platform minor>
       description='Qubell platform client library',
       long_description=open(os.path.join(here,'README')).read(),
       author='Vasyl Khomenko',
@@ -24,7 +26,7 @@ setup(name='qubell-api-python-client',
       packages=find_packages(exclude=['test_qubell_client', 'stories', 'integration_tests', 'integration_tests.testing']),
       package_data={'': ['LICENSE', 'README', 'requirements.txt', 'qubell/monitor/monitor_manifests/*']},
       include_package_data=True,
-      install_requires=required,
+      install_requires=requires,
       tests_require=test_requires,
       test_suite="nosetests",
       entry_points='''
