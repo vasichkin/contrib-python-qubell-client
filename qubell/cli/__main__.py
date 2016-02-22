@@ -996,6 +996,22 @@ def make_default(environment):
     env.set_as_default()
     click.echo(_color("GREEN", "DEFAULT"))
 
+@environment_cli.command("get-keypair")
+@click.argument("environment", default='default')
+@click.argument("filename", default=None, required=False)
+def get_keypair(environment, filename):
+    platform = _get_platform()
+    org = platform.get_organization(QUBELL["organization"])
+    env = org.get_environment(environment)
+
+    if filename:
+        click.echo("Exporting %s to %s " % (_color("BLUE", env.name), filename), nl=False)
+        f = open(filename, "w")
+        f.write(env.get_default_private_key())
+        click.echo(_color("GREEN", "OK"), err=True)
+    else:
+        sys.stdout.write(env.get_default_private_key())
+
 ##############################################################################
 ###############################  OTHER  ######################################
 ##############################################################################
