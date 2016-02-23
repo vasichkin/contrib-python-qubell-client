@@ -39,43 +39,90 @@ Example:
 CLI Tool
 ========
 
-Some operations are available direcly through CLI interface, like creating orgs,
+Many operations are available direcly through CLI interface, like creating orgs,
 initializing cloud accounts, and importing/exporting applications.
 
-    $ python -mqubell.cli 
-    Usage: __main__.py [OPTIONS] COMMAND [ARGS]...
+    $ nomi
+    Usage: nomi [OPTIONS] COMMAND [ARGS]...
+    
+      CLI for tonomi.com using contrib-python-qubell-client
+    
+      To enable completion:
+    
+        eval "$(_NOMI_COMPLETE=source nomi)"
     
     Options:
-      --tenant TEXT        Tenant url to use, QUBELL_TENANT by default
-      --user TEXT          User to use, QUBELL_USER by default
-      --password TEXT      Password to use, QUBELL_PASSWORD by default
-      --organization TEXT  Organization to use, QUBELL_ORGANIZATION by default
-      --help               Show this message and exit.
+      --tenant TEXT         Tenant url to use, QUBELL_TENANT by default
+      --user TEXT           User to use, QUBELL_USER by default
+      --password TEXT       Password to use, QUBELL_PASSWORD by default
+      --organization TEXT   Organization to use, QUBELL_ORGANIZATION by default
+      --debug               Debug mode, also QUBELL_LOG_LEVEL can be used.
+      --help                Show this message and exit.
     
     Commands:
-      create-org
-      export-app
-      import-app
-      list-apps
-      init-ca
-      
-Exporting also can handle dependent submodules, allowing you to download all 
-manifest dependencies:
+      instance
+      application
+      environment
+      organization
+      platform
+      zone
+      manifest
 
-    $ python -mqubell.cli --organization 'ATGTestCase' export-app --output-dir ATG --recursive ATG-Starter-Kit
-    Saving ATG-Starter-Kit v22 => ATG/ATG-Starter-Kit-v22.yml OK
-    Saving Database v7 => ATG/Database-v7.yml OK
-    Saving Application Server v4 => ATG/Application Server-v4.yml OK
-    $
-    $ python -mqubell.cli create-org TestExport
-    TestExport 563c65b2e4b0d565ed1a63ca
-    $
-    $ python -mqubell.cli --organization TestExport import-app ATG/*
-    Importing ATG/ATG-Starter-Kit-v22.yml => ATG-Starter-Kit 563c65e0e4b081eaa2289fce OK
-    Importing ATG/Application Server-v4.yml => Application Server 563c65e1e4b081eaa2289fd1 OK
-    Importing ATG/Database-v7.yml => Database 563c65e3e4b081eaa2289fd4 OK
-        
-                                
+Commands are documented via help:
+    $ nomi instance --help
+    Usage: nomi instance [OPTIONS] COMMAND [ARGS]...
+    ...
+
+Features:
+instance
+      describe     Show details about instance
+      destroy      Destroy instance
+      launch       Launch instance in application
+      list         List instances in current organization or application
+      logs         Get activity logs
+      parameters   Get default launch parameters for application
+      remove       Force remove instance
+      wait-status  Wait until instance status becomes 'Status' or timeout reached
+    
+application
+      delete  Delete application
+      export  Save manifest of applications to files
+      import  Upload manifest to application.
+      list    List applications in organization
+      
+
+environment
+      clear         Clean environment.
+      clone         Copy environment
+      create        Create environment
+      delete        Delete environment
+      describe      Show services, markers and properties of environment
+      export        Save environment to file
+      get-keypair   Download keypair
+      import        Import environment from file
+      init          Add basic services to environment (WF, CA, KS services)
+      list          List environments
+      make-default
+    
+organization
+      create      Create organization
+      import-kit  Import starter kit
+      init        Initialize cloud account service
+      list        List organizations
+      restore     Restore configuration from ENV file
+    
+platform
+      show-account  Exports current account configuration inshell-friendly form. Takes into
+                    account explicit top-level flags like --organization
+    
+zone
+      list          List available zones
+
+
+manifest
+      validate      Validate manifest
+
+
 Running tests
 =============
 
