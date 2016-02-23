@@ -17,7 +17,8 @@ Example:
 """
 parser = argparse.ArgumentParser(description=help_string, formatter_class=argparse.RawTextHelpFormatter)
 parser.add_argument('-v', '--verbose', help='Increase output verbosity', action='store_true')
-parser.add_argument('-d', '--dryrun', help='Do not launch application, only create organization if not exists', action='store_true')
+parser.add_argument('-c', '--create-only', help='Do not launch application, only create organization if not exists', action='store_true')
+parser.add_argument('-d', '--dryrun', help='[Deprecated] Do not launch application, only create organization if not exists', action='store_true')
 parser.add_argument('-u', '--user', help='Email of registered user on tonomi platform')
 parser.add_argument('-p', '--password', help='Password for user')
 parser.add_argument('-t', '--tenant', help='Url to platform')
@@ -36,10 +37,6 @@ password = args.password or os.getenv('QUBELL_PASSWORD')
 tenant = args.tenant or os.getenv('QUBELL_TENANT')
 organization = args.org or os.getenv('QUBELL_ORGANIZATION') or '-=Monitor=-'
 zone = args.zone or os.getenv('QUBELL_ZONE')
-
-assert user
-assert password
-assert tenant
 
 def prepare_monitor(tenant, user, password, organization, zone_name=None):
     """
@@ -127,8 +124,14 @@ class Monitor(object):
         assert "RSA PRIVATE KEY" in key, "Key downloaded, but doesn't look as rsa key"
 
 def main():
+    if not user:
+        parser.print_help()
+        return 1
+    errmsg = "User, password and tenant should be provided"
+    assert password, errmsg
+    assert tenant, errmsg
     mnt = Monitor(tenant=tenant, user=user, password=password, organization=organization, zone=zone)
-    if not args.dryrun:
+    if not(args.create_only or args.dryrun):
         mnt.download_key()
         mnt.launch_monitor()
 
