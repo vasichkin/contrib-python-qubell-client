@@ -145,6 +145,9 @@ def entity(ctx, debug, **kwargs):
 
         def get_platform(self):
             if not self.platform:
+                assert QUBELL["tenant"], "No platform URL provided. Set QUBELL_TENANT or use --tenant option."
+                assert QUBELL["user"], "No username. Set QUBELL_USER or use --user option."
+                assert QUBELL["password"], "No password provided. Set QUBELL_PASSWORD or use --password option."
                 self.platform = QubellPlatform.connect(
                     tenant=QUBELL["tenant"],
                     user=QUBELL["user"],
@@ -524,7 +527,6 @@ def _calc_title(items, template="%s (%s)"):
         else:
             value['_title'] = value['id']
 
-
 def _describe_instance(inst, localtime=None):
     click.echo("Instance    %s  %s  %s" % (inst.id, _color("BLUE", inst.name), _color_status(inst.status)))
     app = inst.application
@@ -545,7 +547,7 @@ def _describe_instance(inst, localtime=None):
         _columns(config, lambda o: pad + o['_title'], lambda o: pad + o['value'])
     if inst.return_values:
         click.echo("Return values: ")
-        endpoints = inst.endpoints
+        endpoints = [{'id': k, 'value':v} for k, v in inst.return_values.iteritems()]
         _calc_title(endpoints)
         _columns(endpoints, lambda o: pad + o['_title'], lambda o: o['value'])
     if inst.workflowsInfo.get('availableWorkflows', []):
