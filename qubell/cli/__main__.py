@@ -111,7 +111,7 @@ def manifest_cli():
 @click.option("--user", default="", help="User to use, QUBELL_USER by default")
 @click.option("--password", default="", help="Password to use, QUBELL_PASSWORD by default")
 @click.option("--organization", default="", help="Organization to use, QUBELL_ORGANIZATION by default")
-@click.option("--debug/--no-debug", default=False, help="Debug mode, also QUBELL_LOG_LEVEL can be used.")
+@click.option("--debug", is_flag=True, default=False, help="Debug mode, also QUBELL_LOG_LEVEL can be used.")
 @click.pass_context
 def entity(ctx, debug, **kwargs):
     """
@@ -724,7 +724,7 @@ def _parse_timestamp(datetime, localtime=False):
     return time.mktime(time_t) + time_shift
 
 
-@instance_cli.command("logs")
+@instance_cli.command("logs", help="Show instance activity log")
 @click.option("--severity", default="INFO", help="Logs severity.")
 @click.option("--localtime/--utctime", default=True, help="Use local or UTC time.")
 @click.option("--sort-by", default="time",
@@ -986,7 +986,7 @@ def import_env(environment, filename, merge, create):
     env.import_yaml(env_file, merge=merge)
     click.echo(_color("GREEN", "OK"))
 
-@environment_cli.command("make-default")
+@environment_cli.command("make-default", help="Set environment as 'default'")
 @click.argument("environment", default='default')
 def make_default(environment):
     platform = _get_platform()
@@ -996,7 +996,7 @@ def make_default(environment):
     env.set_as_default()
     click.echo(_color("GREEN", "DEFAULT"))
 
-@environment_cli.command("get-keypair")
+@environment_cli.command("get-keypair", help="Get private key from environment")
 @click.argument("environment", default='default')
 @click.argument("filename", default=None, required=False)
 def get_keypair(environment, filename):
@@ -1016,7 +1016,7 @@ def get_keypair(environment, filename):
 ###############################  OTHER  ######################################
 ##############################################################################
 
-@zone_cli.command("list")
+@zone_cli.command("list", help="List available zones")
 def list_zones():
     platform = _get_platform()
     org = platform.get_organization(QUBELL["organization"])
@@ -1024,7 +1024,7 @@ def list_zones():
              lambda o: o['id'],
              lambda o: _color("BLUE", o['name']) + (o['isDefault'] and " DEFAULT" or ""))
 
-@manifest_cli.command("validate")
+@manifest_cli.command("validate", help="Perform manifest validation")
 @click.argument("filename", required=False, default=None)
 def validate_manifest(filename):
     platform = _get_platform()
@@ -1044,7 +1044,7 @@ def validate_manifest(filename):
     exit(errors and 1 or 0)
 
 
-@organization_cli.command("import-kit")
+@organization_cli.command("import-kit", help="Import starter kit from ULR")
 @click.option("--category", default=None, help="Category of uploaded applications")
 @click.argument("metadata_url")
 def import_kit(metadata_url, category):
@@ -1075,7 +1075,7 @@ REVERSE_PROVIDER_MAPPING = {
 }
 
 
-@platform_cli.command("show-account")
+@platform_cli.command("show-account", help="Show credentials")
 def show_account():
     """
     Exports current account configuration in
