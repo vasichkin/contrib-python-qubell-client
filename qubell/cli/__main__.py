@@ -544,12 +544,12 @@ def _describe_instance(inst, localtime=None):
         click.echo("Config: ")
         config = inst.config
         _calc_title(config)
-        _columns(config, lambda o: pad + o['_title'], lambda o: pad + o['value'])
+        _columns(config, lambda o: pad + str(o['_title']), lambda o: pad + str(o['value']))
     if inst.return_values:
         click.echo("Return values: ")
         endpoints = [{'id': k, 'value':v} for k, v in inst.return_values.iteritems()]
         _calc_title(endpoints)
-        _columns(endpoints, lambda o: pad + o['_title'], lambda o: o['value'])
+        _columns(endpoints, lambda o: pad + str(o['_title']), lambda o: str(o['value']))
     if inst.workflowsInfo.get('availableWorkflows', []):
         click.echo("Workflows: ")
         for workflow in inst.workflowsInfo.get('availableWorkflows', []):
@@ -862,7 +862,7 @@ def clear_env(environment, destroy_services, force, fallback_force):
 
 @environment_cli.command("init", help="Add basic services to environment (WF, CA, KS services)")
 @click.option("--zone", default=None, help="In what zone services should be launched")
-@click.option("--without-cloud-account", is_flag=True, default=True, help="Whether init-ca should be performed")
+@click.option("--without-cloud-account", is_flag=True, default=False, help="Whether init-ca should be performed")
 @click.argument("environment", default="default")
 def init_env(environment, without_cloud_account, zone):
     platform = _get_platform()
