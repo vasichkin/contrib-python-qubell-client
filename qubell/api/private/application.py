@@ -178,7 +178,7 @@ class Application(Entity, InstanceRouter):
 
 # MANIFEST
 
-    def get_manifest(self, version):
+    def get_manifest(self, version=None):
         if not version:
             return self._router.post_application_refresh(org_id=self.organizationId, app_id=self.applicationId).json()
         else:
