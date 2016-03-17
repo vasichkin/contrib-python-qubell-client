@@ -188,6 +188,10 @@ class PrivatePath(Router):
     def get_instance_configuration(self, org_id, instance_id, cookies, ctype=".json"): pass
 
     @play_auth
+    @route("POST /organizations/{org_id}/instances/{instance_id}/reconfigure{ctype}")
+    def post_instance_reconfigure(self, org_id, instance_id, cookies, data="{}", ctype=".json"): pass
+
+    @play_auth
     @route("PUT /organizations/{org_id}/instances/{instance_id}/rename{ctype}")
     def put_instance_rename(self, org_id, instance_id, data, cookies, ctype=".json"): pass
 
