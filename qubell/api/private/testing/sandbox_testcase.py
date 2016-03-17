@@ -136,7 +136,7 @@ class SandBoxTestCase(SetupOnce, unittest.TestCase):
         log.info("\n---------------  Cleaning sandbox  ---------------")
 
         self.destroy_instances(self.regular_instances)
-        self.destroy_instances(self.service_instances)
+        self.destroy_instances(reversed(self.service_instances))
         self.regular_instances = []
         self.service_instances = []
 
