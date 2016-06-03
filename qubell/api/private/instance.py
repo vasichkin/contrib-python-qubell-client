@@ -402,23 +402,32 @@ class Instance(Entity, ServiceMixin, InstanceRouter):
         return self._router.post_application_refresh(org_id=self.organizationId, app_id=self.applicationId).json()
 
     def reconfigure(self, revision=None, parameters=None, submodules=None, manifestVersion=None):
-        # note: be carefull refactoring this, or you might have unpredictable results
-        # todo: private api seems requires at least presence of submodule names if exist
-        payload = {'parameters': self.parameters}
+        # if no parameters are specified, use an alternative, more concise API route
+        if not revision \
+           and parameters is None \
+           and not submodules \
+           and not manifestVersion:
+            resp = self._router.post_instance_reconfigure(org_id=self.organizationId, instance_id=self.instanceId)
+            return resp.json()
 
-        if revision:
-            payload['revisionId'] = revision.id
+        else:
+            # note: be carefull refactoring this, or you might have unpredictable results
+            # todo: private api seems requires at least presence of submodule names if exist
+            payload = {'parameters': self.parameters}
 
-        if submodules:
-            payload['submodules'] = submodules
-        if parameters is not None:
-            payload['parameters'] = parameters
-        if manifestVersion:
-            payload['manifestVersion'] = manifestVersion
+            if revision:
+                payload['revisionId'] = revision.id
 
-        resp = self._router.put_instance_configuration(org_id=self.organizationId, instance_id=self.instanceId,
-                                                       data=json.dumps(payload))
-        return resp.json()
+            if submodules:
+                payload['submodules'] = submodules
+            if parameters is not None:
+                payload['parameters'] = parameters
+            if manifestVersion:
+                payload['manifestVersion'] = manifestVersion
+
+            resp = self._router.put_instance_configuration(org_id=self.organizationId, instance_id=self.instanceId,
+                                                           data=json.dumps(payload))
+            return resp.json()
 
     def rename(self, name):
         payload = json.dumps({'name': name})
