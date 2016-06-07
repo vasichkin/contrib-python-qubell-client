@@ -511,6 +511,20 @@ class PublicPath(PrivatePath):
     @route("GET /api/1/organizations")
     def api1_organization_list(self, auth): pass
 
+    # Users
+
+    @basic_auth
+    @route("GET /api/1/organizations/{org_id}/users")
+    def api1_user_list(self, org_id, auth): pass
+
+    @basic_auth
+    @route("PUT /api/1/organizations/{org_id}/users/{user_id}/roles")
+    def api1_user_roles_assign(self, org_id, user_id, json, auth): pass
+
+    @basic_auth
+    @route("DELETE /api/1/organizations/{org_id}/users/{user_id}/roles")
+    def api1_user_roles_revoke(self, org_id, user_id, json, auth): pass
+
     # Revisions
 
     @basic_auth
@@ -531,6 +545,27 @@ class PublicPath(PrivatePath):
     @route("POST /api/1/services/{service_id}/{command}")
     def api1_service_execute(self, service_id, command, json, auth): pass
 
+    # Roles
+
+    @basic_auth
+    @route("GET /api/1/organizations/{org_id}/roles")
+    def api1_role_list(self, org_id, auth): pass
+
+    @basic_auth
+    @route("GET /api/1/roles/{role_id}")
+    def api1_role_details(self, role_id, auth): pass
+
+    @basic_auth
+    @route("POST /api/1/organizations/{org_id}/roles")
+    def api1_role_create(self, org_id, json, auth): pass
+
+    @basic_auth
+    @route("PUT /api/1/roles/{role_id}")
+    def api1_role_update(self, role_id, json, auth): pass
+
+    @basic_auth
+    @route("DELETE /api/1/roles/{role_id}")
+    def api1_role_delete(self, role_id, auth): pass
 
 # TODO: Public api hack.
 # To use public api routes, set QUBELL_USE_PUBLIC env to not None
