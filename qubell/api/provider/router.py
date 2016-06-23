@@ -260,6 +260,10 @@ class PrivatePath(Router):
     @route("GET /organizations/{org_id}/environments/{env_id}/export")
     def get_env_export(self, org_id, env_id, cookies): pass
 
+    @play_auth
+    @route("POST /api/1/environments/{env_id}/clone")
+    def post_env_clone(self, env_id, cookies, json): pass
+
     #Zone
     @play_auth
     @route("GET /organizations/{org_id}/zones{ctype}")
