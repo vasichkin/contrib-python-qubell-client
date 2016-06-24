@@ -14,11 +14,27 @@
 # limitations under the License.
 from functools import wraps
 import inspect
+import logging as log
+import os
 
 __author__ = "Vasyl Khomenko"
 __copyright__ = "Copyright 2013, Qubell.com"
 __license__ = "Apache"
 __email__ = "vkhomenko@qubell.com"
+
+
+# Setup logging
+
+log_opts={'format': '%(asctime)s %(levelname)s:%(name)s:%(message)s'}
+if os.getenv('QUBELL_LOG_LEVEL', 'info') == 'debug':
+    log_opts['level'] = log.INFO
+else:
+    log_opts['level'] = log.DEBUG
+
+if os.getenv('QUBELL_LOG_TO_FILE'):
+    log_opts['filename']=os.getenv('QUBELL_LOG_TO_FILE')
+log.basicConfig(**log_opts)
+
 
 def operations():
     """
