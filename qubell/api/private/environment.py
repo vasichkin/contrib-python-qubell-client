@@ -133,6 +133,7 @@ class Environment(Entity, InstanceRouter):
         except exceptions.ApiError:  # #4242
             from random import randint
 
+            # noinspection PyArgumentEqualDefault
             @retry(3, 1, 1, exceptions.ApiError)
             def put_again():
                 time.sleep(randint(1, 10))
@@ -354,10 +355,10 @@ class Environment(Entity, InstanceRouter):
             return wf_service, key_service
 
         cloud_account_service = self.organization.instance(name=zone_names.DEFAULT_CLOUD_ACCOUNT_SERVICE,
-                                                          application=type_to_app(CLOUD_ACCOUNT_TYPE),
-                                                          environment=self,
-                                                          parameters=PROVIDER_CONFIG,
-                                                          destroyInterval=0)
+                                                           application=type_to_app(CLOUD_ACCOUNT_TYPE),
+                                                           environment=self,
+                                                           parameters=PROVIDER_CONFIG,
+                                                           destroyInterval=0)
         # Imidiate adding to env cause CA not to drop destroy interval. Known issue 6132. So, add service as instance with
         # destroyInterval set to 'never'
         assert cloud_account_service.running()
@@ -390,6 +391,14 @@ class Environment(Entity, InstanceRouter):
             return versions[ZONE_NAME]
         else:
             return versions[self.organization.get_default_zone().name]
+
+    def clone(self, name=None):
+        """
+        :param name: new env name
+        :rtype: Environment
+        """
+        resp = self._router.post_env_clone(env_id=self.environmentId, json=dict(name=name) if name else {}).json()
+        return Environment(self.organization, id=resp['id']).init_router(self._router)
 
 
 class EnvironmentList(QubellEntityList):
