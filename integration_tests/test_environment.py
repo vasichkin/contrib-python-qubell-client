@@ -204,6 +204,42 @@ class EnvironmentClassTest(BaseTestCase):
     def test_remove_absent_property(self):
         self.env.remove_property("ghost")
 
+    def create_full_environment(self, name):
+        environment = self.organization.create_environment(name)
+        self.addCleanup(lambda: environment.delete())
+        environment.init_common_services(with_cloud_account=False)
+        with environment as env:
+            env.add_marker("test_clone")
+            env.add_property("foo", "string", "clone")
+            env.add_policy(action="bar", parameter="baz", value="brr")
+        return environment
+
+    def assert_full_environment(self, env):
+        assert len(env.services) == 2, "wrong number of services in env"
+        env_json = env.json()
+        assert self.marker_exists(env_json, "test_clone")
+        assert self.property_exists(env_json, "foo", "clone")
+        assert self.policy_exists(env_json, "bar.baz", "brr")
+
+
+    def test_clone_environment_noname(self):
+        env = self.create_full_environment("test clone unnamed")
+
+        cloned_env = env.clone()
+        self.addCleanup(lambda: cloned_env.delete())
+
+        assert cloned_env.name.startswith("Copy of ")
+        self.assert_full_environment(cloned_env)
+
+    def test_clone_environment_custom_name(self):
+        env = self.create_full_environment("test clone named")
+
+        cloned_env = env.clone("clone name env")
+        self.addCleanup(lambda: cloned_env.delete())
+
+        assert cloned_env.name == "clone name env"
+        self.assert_full_environment(cloned_env)
+
     # helpers
 
     def marker_exists(self, data, name):
