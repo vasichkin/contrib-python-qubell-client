@@ -77,18 +77,20 @@ def waitForStatus(instance, final='Active', accepted=None, timeout=(20, 10, 1)):
 
     if not isinstance(final, list): final = [final]
 
+    final = [x.upper() for x in final]
+
     @retry(3, 1, 2)  # max = 1 + 2 + 4 = 7 seconds + routes time
     def projection_update_monitor():
         """
         We have to deal with lag when projection updates instance.
         :return:
         """
-        return instance.status not in final or instance._is_projection_updated_instance()
+        return instance.status.upper() not in final or instance._is_projection_updated_instance()
     projection_update_monitor()
 
     @retry(*timeout)  # ask status 20 times every 10 sec.
     def instance_status_waiter():
-        cur_status = instance.status
+        cur_status = instance.status.upper()
         if cur_status in final:
             log.debug('Instance %s got expected status: %s, continue' % (info, cur_status))
             return True
@@ -102,7 +104,7 @@ def waitForStatus(instance, final='Active', accepted=None, timeout=(20, 10, 1)):
     instance_status_waiter()
     # We here, means we reached timeout or got status we are waiting for.
     # Check it again to be sure
-    cur_status = instance.status
+    cur_status = instance.status.upper()
     log.info('Instance %s final status: %s, expected status: %s, elapsed time: %s sec.' % (info, cur_status, final, int(time.time()-started)))
     instance._last_workflow_started_time = time.gmtime(time.time())
     if cur_status in final:
