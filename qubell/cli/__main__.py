@@ -112,8 +112,9 @@ def manifest_cli():
 @click.option("--password", default="", help="Password to use, QUBELL_PASSWORD by default")
 @click.option("--organization", default="", help="Organization to use, QUBELL_ORGANIZATION by default")
 @click.option("--debug", is_flag=True, default=False, help="Debug mode, also QUBELL_LOG_LEVEL can be used.")
+@click.option("--uncolorize", is_flag=True, default=False, help="Do not colorize output")
 @click.pass_context
-def entity(ctx, debug, **kwargs):
+def entity(ctx, debug, uncolorize, **kwargs):
     """
     CLI for tonomi.com using contrib-python-qubell-client
 
@@ -139,9 +140,9 @@ def entity(ctx, debug, **kwargs):
     }
 
     class UserContext(object):
-
         def __init__(self):
             self.platform = None
+            self.colorize = not(uncolorize)
 
         def get_platform(self):
             if not self.platform:
@@ -153,6 +154,7 @@ def entity(ctx, debug, **kwargs):
                     user=QUBELL["user"],
                     password=QUBELL["password"])
             return self.platform
+
 
     ctx = click.get_current_context()
     ctx.obj = UserContext()
@@ -185,9 +187,13 @@ def _get_platform():
     return click.get_current_context().obj.get_platform()
 
 def _color(color, text):
-    if not isinstance(text, basestring):
-        text = str(text)
-    return getattr(Fore, color) + text + Style.RESET_ALL
+    colorize = click.get_current_context().obj.colorize
+    if colorize:
+        if not isinstance(text, basestring):
+            text = str(text)
+        return getattr(Fore, color) + text + Style.RESET_ALL
+    else:
+        return text
 
 def _print_message(message, color="BLACK"):
     if "message" in message:
@@ -513,11 +519,15 @@ def _describe_instance_short(inst):
 
 @instance_cli.command("describe", help="Show details about instance")
 @click.argument("instance")
-def describe_instance(instance, localtime=True):
+@click.option("--json", is_flag=True, default=False, help="Print raw json")
+def describe_instance(instance, json, localtime=True):
     platform = _get_platform()
     org = platform.get_organization(QUBELL["organization"])
-    inst = org.get_instance(instance)
-    _describe_instance(inst, localtime)
+    inst = org.instances[instance]
+    if json:
+        click.echo(inst._router.get_instance(org_id=inst.organizationId, instance_id=inst.instanceId).text)
+    else:
+        _describe_instance(inst, localtime)
 
 
 def _calc_title(items, template="%s (%s)"):
@@ -587,7 +597,7 @@ def _describe_submodules(path, submodules, level):
 @instance_cli.command("launch", help="Launch instance in application")
 @click.option("--revision", default=None, help="Revision to launch")
 @click.option("--environment", default=None, help="Environment used to launch instance")
-@click.option("--destroy", default=None, help="Schedule destroy (seconds)")
+@click.option("--destroy", default=60*60, help="Schedule destroy (seconds)")
 @click.option("--parameter", default=False, type=(unicode, unicode), multiple=True, help="Parameter value")
 @click.argument("application")
 @click.argument("name", default=None, required=False)
@@ -595,7 +605,6 @@ def launch_instance(revision, environment, destroy, application, name, parameter
     platform = _get_platform()
     org = platform.get_organization(QUBELL["organization"])
     app = org.get_application(application)
-    destroy_interval = _map_opt(destroy, lambda x: x / 1000)
     env = _map_opt(environment, org.get_environment)
     parameters = dict()
     submodules = dict()
@@ -618,7 +627,7 @@ def launch_instance(revision, environment, destroy, application, name, parameter
             parameters[param_name] = param_value
 
     inst = org.create_instance(application=app, revision=revision, environment=env,
-                               name=name, parameters=parameters, destroyInterval=destroy_interval,
+                               name=name, parameters=parameters, destroyInterval=destroy*1000,
                                submodules=submodules)
     _describe_instance(inst, True)
 
@@ -682,11 +691,14 @@ def wait_status(instance, status, timeout):
     inst = org.get_instance(instance)
     timeout = int(timeout)
     # TODO case-insensitive
-    accepted_states = ['Destroying', 'Active', 'Running', 'Executing', 'Unknown']
+    accepted_states = ['Launching', 'Destroying', 'Active', 'Running', 'Executing', 'Unknown', 'Requested']
+    res = False
     try:
-        waitForStatus(instance=inst, final=status, accepted=accepted_states, timeout=[timeout * 20, 3, 1])
+        res = waitForStatus(instance=inst, final=status, accepted=accepted_states, timeout=[timeout * 20, 3, 1])
     finally:
         _describe_instance_short(org.get_instance(instance))
+    if not res: # Exit non-zero if status not reached
+        exit(1)
 
 
 @instance_cli.command("remove", help="Force remove instance")
