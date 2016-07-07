@@ -116,7 +116,7 @@ class Instance(Entity, ServiceMixin, InstanceRouter):
         for (interfaceName, interfaceData) in interfaces.items():
             signalValues = interfaceData.get("signals", {})
             for (signalName, signalValue) in signalValues.items():
-                pinName = "{}.{}".format(interfaceName, signalName)
+                pinName = "{0}.{1}".format(interfaceName, signalName)
                 acc.append({'id': pinName, 'value': signalValue})
         return acc
 
@@ -279,7 +279,7 @@ class Instance(Entity, ServiceMixin, InstanceRouter):
         if name:
             conf['instanceName'] = name
         if destroyInterval is not None:
-            conf['destroyInterval'] = destroyInterval
+            conf['destroyInterval'] = int(destroyInterval)
         if revision:
             conf['revisionId'] = revision.id
         conf['submodules'] = submodules or {}
