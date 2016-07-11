@@ -35,12 +35,14 @@ SHARED_INSTANCE_CATALOG_TYPE = 'builtin:shared_instances_catalog'
 STATIC_RESOURCE_POOL_TYPE = 'builtin:static_resource_pool'
 CLOUD_ACCOUNT_TYPE = 'builtin:cloud_account'
 AMAZON_CLOUD_TYPE = 'builtin:amazon_account'
+GCE_CLOUD_TYPE = 'builtin:GCE_account'
 
 system_application_types = {COBALT_SECURE_STORE_TYPE: 'Secure Vault 2.0', WORKFLOW_SERVICE_TYPE: 'Workflow Service',
                             SHARED_INSTANCE_CATALOG_TYPE: 'Shared Instances Catalog',
                             STATIC_RESOURCE_POOL_TYPE: 'Resource Pool',
                             CLOUD_ACCOUNT_TYPE: 'Cloud Account',
-                            AMAZON_CLOUD_TYPE: 'Amazon Account'}
+                            AMAZON_CLOUD_TYPE: 'Amazon Account',
+                            GCE_CLOUD_TYPE:'GCE Account'}
 
 system_application_parameters = {
     COBALT_SECURE_STORE_TYPE: None,
