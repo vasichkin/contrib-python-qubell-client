@@ -290,6 +290,10 @@ class PrivatePath(Router):
     @route("GET /organizations/{org_id}/environments/{env_id}/id_rsa")
     def get_environment_default_private_key(self, org_id, env_id, cookies): pass
 
+    @play_auth
+    @route("POST /organizations/{org_id}/services/{instance_id}/secrets/{secret_id}/upload{ctype}")
+    def post_request_upload_secret(self, org_id, instance_id, secret_id, cookies, data="{}", ctype=".json"): pass
+
     # Role
     @play_auth
     @route("POST /organizations/{org_id}/roles{ctype}")

@@ -13,11 +13,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-__author__ = "Vasyl Khomenko"
-__copyright__ = "Copyright 2013, Qubell.com"
-__license__ = "Apache"
-__email__ = "vkhomenko@qubell.com"
-
 import yaml
 import simplejson as json
 
@@ -26,6 +21,11 @@ from qubell.api.tools import retry
 
 __all__ = ['COBALT_SECURE_STORE_TYPE', 'WORKFLOW_SERVICE_TYPE', 'SHARED_INSTANCE_CATALOG_TYPE',
            'STATIC_RESOURCE_POOL_TYPE', 'CLOUD_ACCOUNT_TYPE', 'AMAZON_CLOUD_TYPE']
+
+__author__ = "Vasyl Khomenko"
+__copyright__ = "Copyright 2013, Qubell.com"
+__license__ = "Apache"
+__email__ = "vkhomenko@qubell.com"
 
 # ToDo: Move to Globals
 
@@ -69,6 +69,8 @@ class ServiceMixin(object):
         payload = json.dumps({"revisionNameId": revision.nameId,
                               "instanceId": instance.instanceId})
         self._router.post_instance_shared(org_id=self.organizationId, env_id=instance.environment.id, data=payload)
+
+        # noinspection PyArgumentEqualDefault
         @retry(5, 1, 2)
         def wait_config_propagate():
             return self.get_shared_instance_id(revision.nameId) == instance.instanceId
@@ -111,3 +113,11 @@ class ServiceMixin(object):
         if 'templateId' in raw:
             return raw['templateId'] == COBALT_SECURE_STORE_TYPE
         return False
+
+    def request_upload_secret(self, secret_id):
+        """
+        :return: json with "keyId" as secret and "url" for posting key
+        """
+        return self._router.post_request_upload_secret(org_id=self.organizationId,
+                                                       instance_id=self.instanceId,
+                                                       secret_id=secret_id).json()
