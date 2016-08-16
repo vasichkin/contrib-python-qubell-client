@@ -14,6 +14,7 @@
 # limitations under the License.
 import re
 import functools
+import requests
 
 __author__ = "Vasyl Khomenko"
 __copyright__ = "Copyright 2013, Qubell.com"
@@ -195,14 +196,54 @@ def full_dump(org):
     pass
 
 def load_env(file):
+    """
+    Generate environment used for 'org.restore' method
+    :param file: env file
+    :return: env
+    """
+
     env = yaml.load(open(file))
 
     for org in env.get('organizations', []):
+        if not org.get('applications'):
+            org['applications'] = []
+
+        if org.get('starter-kit'):
+            kit_meta = get_starter_kit_meta(org.get('starter-kit'))
+            for meta_app in get_applications_from_metadata(kit_meta):
+                org['applications'].append(meta_app)
+
+        if org.get('meta'):
+            for meta_app in get_applications_from_metadata(org.get('meta')):
+                org['applications'].append(meta_app)
+
         for app in org.get('applications', []):
             if app.get('file'):
-
-                app['file']=os.path.realpath(os.path.join(os.path.dirname(file), app['file']))
+                app['file'] = os.path.realpath(os.path.join(os.path.dirname(file), app['file']))
     return env
+
+
+def get_applications_from_metadata(metadata, base_path=''):
+    # Treat meta as file or link?
+    if metadata.startswith('http'):
+        meta = yaml.safe_load(requests.get(url=metadata).content)
+    else:
+        meta = yaml.safe_load(open(metadata).read())
+    applications = []
+
+    for app in meta['kit']['applications']:
+        if 'http' in app['manifest']:
+            applications.append({
+                'name': app['name'],
+                'url': app['manifest']})
+        else:
+            path = str(base_path) + '/' + str(app['manifest'])
+            applications.append({
+                'name': app['name'],
+                'file': path})
+    return applications
+
+
 
 def patch_env(env, path, value):
         """ Set specified value to yaml path.
@@ -249,3 +290,36 @@ def lazy(func):
 def is_bson_id(bson_id):
     id_pattern = u'[A-Fa-f0-9]{24}'
     return re.match(id_pattern, unicode(bson_id))
+
+
+# See https://github.com/qubell/vermilion/blob/master/deployment/docker/ui/application.conf
+starter_kits_url = "https://s3.amazonaws.com/qubell-static/starter-kits-metadata.yml"
+
+def get_starter_kit_meta(name):
+    """
+    Extract metadata link for starter kit from platform configs. Starter kit available on add component - starter kit menu.
+    Beware, config could be changed by deploy scripts during deploy.
+    :param name: Name of starter kit
+    :return: Link to metadata
+    """
+    kits = yaml.safe_load(requests.get(url=starter_kits_url).content)['kits']
+    kits_meta_url = [x['metaUrl'] for x in kits if x['name'] == name]
+
+    assert len(kits_meta_url)==1, "No component %s found in meta:\n %s" % (name, kits)
+    meta = yaml.safe_load(requests.get(url=kits_meta_url[0]).content)['download_url']
+    return meta
+
+def get_manifest_from_meta(metaurl, name):
+    """
+    Extact manifest url from metadata url
+    :param metaurl: Url to metadata
+    :param name: Name of application to extract
+    :return:
+    """
+    if 'http' in metaurl:
+        kit = yaml.safe_load(requests.get(url=metaurl).content)['kit']['applications']
+    else:
+        kit = yaml.safe_load(open(metaurl).read())['kit']['applications']
+    app_urls = [x['manifest'] for x in kit if x['name'] == name]
+    assert len(app_urls) == 1
+    return app_urls[0]
