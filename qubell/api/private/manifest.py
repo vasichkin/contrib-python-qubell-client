@@ -12,15 +12,14 @@
 # implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import requests
+import yaml
+import os
 
 __author__ = "Vasyl Khomenko"
 __copyright__ = "Copyright 2013, Qubell.com"
 __license__ = "Apache"
 __email__ = "vkhomenko@qubell.com"
-
-import requests
-import yaml
-import os
 
 
 class Manifest(object):
@@ -31,23 +30,35 @@ class Manifest(object):
     # noinspection PyShadowingBuiltins
     def __init__(self, name=None, content=None, url=None, file=None):
         self.name = name
-        if url:
-            self.url = url
-            self.source = url
-            self.content = requests.get(url).content
-        elif content:
+
+        self.url = url
+        self._raw_content = content
+        if content:
             self.source = 'Text'
-            self.content = content
-        elif file:
-            if os.path.exists(file):
-                self.file = file
-            elif os.path.exists(os.path.join(os.path.dirname(__file__), file)):
-                self.file = os.path.join(os.path.dirname(__file__), file)
+        self._manifest_file = file
+
+        self.source = None
+        self.file = file
+
+    @property
+    def content(self):
+        if self._raw_content:
+            return self._raw_content
+        # external data read only once
+        if self.url:
+            self.source = self.url  # todo: should be "Url"
+            self._raw_content = requests.get(self.url).content
+        elif self._manifest_file:
+            if os.path.exists(self._manifest_file):
+                self.file = self._manifest_file
+            elif os.path.exists(os.path.join(os.path.dirname(__file__), self._manifest_file)):
+                self.file = os.path.join(os.path.dirname(__file__), self._manifest_file)
             else:
-                exit("No manifest found: %s " % self.name)
+                exit(u"No manifest found '{0}' at '{1}'".format(self.name, self._manifest_file))
             # noinspection PyArgumentEqualDefault
-            self.content = open(self.file, 'r').read()
-            self.source = self.file
+            self.source = self.file  # todo: should be 'File'
+            self._raw_content = open(self.file).read()
+        return self._raw_content
 
     def patch(self, path, value=None):
         """ Set specified value to yaml path.
@@ -80,5 +91,5 @@ class Manifest(object):
             pathSet(src, path, value)
         else:
             pathRm(src, path)
-        self.content = yaml.safe_dump(src, default_flow_style=False)
+        self._raw_content = yaml.safe_dump(src, default_flow_style=False)
         return True
