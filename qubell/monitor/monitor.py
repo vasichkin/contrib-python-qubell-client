@@ -18,6 +18,13 @@ Set environment variables QUBELL_USER, QUBELL_PASSWORD, QUBELL_TENANT or use opt
 
 Example:
   python monitor.py -v -o myorg -u 'user@tonomi.com' -p 'MyPass' -t 'https://express.tonomi.com'
+
+Performance monitor:
+Monitor can act as continuous performance monitor. It measures time of monitor execution.
+Use -x option to set number of monitor instances launched.
+If set env var 'RESULT_DATADOG_API_KEY' and 'RESULT_DATADOG_APP_KEY' results will be pushed to datadog with name monitor.execution_duration.ZONE.
+Also, results will be stored in 'perfrep.ZONE' file that file in csv format. Set 'RESULT_FILE' to ovveride file name.
+
 """
 parser = argparse.ArgumentParser(description=help_string, formatter_class=argparse.RawTextHelpFormatter)
 parser.add_argument('-v', '--verbose', help='Output INFO messages', action="store_true")
@@ -29,7 +36,7 @@ parser.add_argument('-p', '--password', help='Password for user')
 parser.add_argument('-t', '--tenant', help='Url to platform')
 parser.add_argument('-o', '--org', help='Organization name to use. Default is -=Monitor=-')
 parser.add_argument('-z', '--zone', help='Zone name to use. Default is root zone')
-parser.add_argument('-x', '--performance', help='Measure performance')
+parser.add_argument('-x', '--performance', help='Measure performance. Launch this number of instances in parallel and measure report time.')
 
 loglevel = logging.WARNING
 args = parser.parse_args()
@@ -46,7 +53,7 @@ logging.getLogger().setLevel(loglevel)
 user = args.user or os.getenv('QUBELL_USER')
 password = args.password or os.getenv('QUBELL_PASSWORD')
 tenant = args.tenant or os.getenv('QUBELL_TENANT')
-organization = args.org or os.getenv('QUBELL_ORGANIZATION') or 'TestMonitor123'
+organization = args.org or os.getenv('QUBELL_ORGANIZATION') or '-=Monitor=-'
 zone_name = args.zone or os.getenv('QUBELL_ZONE')
 
 
@@ -112,7 +119,7 @@ class Monitor(object):
     This the minimum required to ensure that system works and configured properly.
     """
 
-    destroy_interval = "10000"  # ms, keep it as a string
+    destroy_interval = "100000"  # ms, keep it as a string
 
     def __init__(self, org=None, app=None, env=None):
         if not all([org, app, env]):
@@ -128,20 +135,25 @@ class Monitor(object):
         self.start_time = 0
         self.end_time = 0
 
-    def launch(self):
+    def launch(self, timeout=2):
         """
         Hierapp instance, with environment dependencies:
         - can be launched within short timeout
         - auto-destroys shortly
         """
         self.start_time = time.time()
+        self.end_time = time.time()
         instance = self.app.launch(environment=self.env)
-        assert instance.running(timeout=2), "Monitor didn't get Active state"
-        self.status = instance.status
+        time.sleep(2) # Instance need time to appear in ui
+
+        assert instance.running(timeout=timeout), "Monitor didn't get Active state"
+        launched = instance.status == 'Active'
         instance.reschedule_workflow(workflow_name='destroy', timestamp=self.destroy_interval)
-        assert instance.destroyed(timeout=1), "Monitor didn't get Destroyed after short time"
+        assert instance.destroyed(timeout=timeout), "Monitor didn't get Destroyed after short time"
+        stopped = instance.status == 'Destroyed'
         instance.force_remove()
         self.end_time = time.time()
+        self.status = launched and stopped
 
     def download_key(self):
         """
@@ -169,7 +181,7 @@ class LaunchThread(threading.Thread):
 
     def run(self):
         try:
-            self.flow.launch()
+            self.flow.launch(timeout=10)
         except:
             log_exception(*sys.exc_info())
 
@@ -193,12 +205,32 @@ class PerformanceMonitor(object):
     def launch(self):
         for mon in self.monitors:
             mon.start()
-            time.sleep(1)
 
         for mon in self.monitors:
             mon.join()
             self.statuses.append(mon.status)
             self.exec_time.append(mon.end_time - mon.start_time)
+
+def publish_results(value):
+    dd_api_key = os.environ.get('RESULT_DATADOG_API_KEY')
+    dd_app_key = os.environ.get('RESULT_DATADOG_APP_KEY')
+    file = os.environ.get('RESULT_FILE', 'perfrep.%s' % zone_name)
+
+
+    if dd_api_key and dd_app_key:
+        logging.info('Publishing results: %s' % value)
+        from datadog import initialize, api
+        now = time.time()
+        initialize(api_key=dd_api_key, app_key=dd_app_key)
+        api.Metric.send(metric='monitor.execution_duration.%s' % zone_name, points=(now, value), tags=["stack:dev", "tenant:staging"])
+
+    if file:
+        logging.info('Saving to file: %s' % value)
+        f = open(file, 'w')
+        f.write('seconds\n')
+        f.write('%s\n' % value)
+        f.close()
+
 
 
 def main():
@@ -208,27 +240,34 @@ def main():
     errmsg = "User, password and tenant should be provided"
     assert password, errmsg
     assert tenant, errmsg
-    status = 0
+    status = -1
 
     if not(args.create_only or args.dryrun):
         mnt = Monitor()
-        mnt.download_key()
-        mnt.launch()
-        status = 0 if mnt.status in 'Active' else 1
+        try:
+            mnt.download_key()
+            mnt.launch(timeout=10)
+        except:
+            log_exception(*sys.exc_info())
 
-        if args.performance:
+        status = 0 if mnt.status else 1
+
+        if args.performance and status == 0:
             perfmnt = PerformanceMonitor(mnt, int(args.performance))
             perfmnt.launch()
             logging.info("statuses: %s" % perfmnt.statuses)
             logging.info("exec_times: %s" % perfmnt.exec_time)
-            f = open('perfrep.%s' % zone_name, 'w')
-            f.write('seconds\n')
-            if any(perfmnt.statuses): # All monitors passed
-                f.write('%s\n' % int(sum(perfmnt.exec_time) / len(perfmnt.exec_time)))
+
+            if all(perfmnt.statuses): # All monitors passed
+                publish_results(int(sum(perfmnt.exec_time) / len(perfmnt.exec_time)))
+                status = 0
+            elif any(perfmnt.statuses):
+                times = [x for x in perfmnt.exec_time if x > 0]
+                publish_results(int(sum(times) / len(times)))
+                status = 1
             else:
-                f.write('-1')
+                publish_results(0)
                 status = 2
-            f.close()
     exit(status)
 if __name__ == '__main__':
     main()
