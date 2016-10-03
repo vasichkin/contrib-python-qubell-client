@@ -105,9 +105,9 @@ def manifest_cli():
     pass
 
 
-
 @click.group()
 @click.option("--tenant", default="", help="Tenant url to use, QUBELL_TENANT by default")
+@click.option("--token", default="", help="Refresh token to use, QUBELL_TOKEN by default")
 @click.option("--user", default="", help="User to use, QUBELL_USER by default")
 @click.option("--password", default="", help="Password to use, QUBELL_PASSWORD by default")
 @click.option("--organization", default="", help="Organization to use, QUBELL_ORGANIZATION by default")
@@ -147,12 +147,15 @@ def entity(ctx, debug, uncolorize, **kwargs):
         def get_platform(self):
             if not self.platform:
                 assert QUBELL["tenant"], "No platform URL provided. Set QUBELL_TENANT or use --tenant option."
-                assert QUBELL["user"], "No username. Set QUBELL_USER or use --user option."
-                assert QUBELL["password"], "No password provided. Set QUBELL_PASSWORD or use --password option."
+                if not QUBELL["token"]:
+                    assert QUBELL["user"], "No username. Set QUBELL_USER or use --user option."
+                    assert QUBELL["password"], "No password provided. Set QUBELL_PASSWORD or use --password option."
+
                 self.platform = QubellPlatform.connect(
                     tenant=QUBELL["tenant"],
                     user=QUBELL["user"],
-                    password=QUBELL["password"])
+                    password=QUBELL["password"],
+                    token=QUBELL["token"])
             return self.platform
 
 

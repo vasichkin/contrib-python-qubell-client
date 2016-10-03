@@ -41,7 +41,7 @@ class QubellPlatform(InstanceRouter):
         assert not (auth or context), "support of auth and context parameters is removed"
 
     @staticmethod
-    def connect(tenant=None, user=None, password=None, is_public=False):
+    def connect(tenant=None, user=None, password=None, token=None, is_public=False):
         """
         Authenticates user and returns new platform to user.
         This is an entry point to start working with Qubell Api.
@@ -49,6 +49,7 @@ class QubellPlatform(InstanceRouter):
         :param str tenant: url to tenant, default taken from 'QUBELL_TENANT'
         :param str user: user email, default taken from 'QUBELL_USER'
         :param str password: user password, default taken from 'QUBELL_PASSWORD'
+        :param str token: session token, default taken from 'QUBELL_TOKEN'
         :param bool is_public: either to use public or private api (public is not fully supported use with caution)
         :return: New Platform instance
         """
@@ -57,19 +58,20 @@ class QubellPlatform(InstanceRouter):
         else:
             router = PublicPath(tenant)
             router.public_api_in_use = is_public
-        router.connect(user, password)
+        router.connect(user, password, token)
         return QubellPlatform().init_router(router)
 
-    def connect_to_another_user(self, user, password, is_public=False):
+    def connect_to_another_user(self, user, password, token=None, is_public=False):
         """
         Authenticates user with the same tenant as current platform using and returns new platform to user.
         :rtype: QubellPlatform
         :param str user: user email
         :param str password: user password
+        :param str token: session token
         :param bool is_public: either to use public or private api (public is not fully supported use with caution)
         :return: New Platform instance
         """
-        return QubellPlatform.connect(self._router.base_url, user, password, is_public)
+        return QubellPlatform.connect(self._router.base_url, user, password, token, is_public)
 
     def list_organizations_json(self):
         resp = self._router.get_organizations()
