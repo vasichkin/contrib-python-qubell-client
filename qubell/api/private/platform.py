@@ -12,19 +12,14 @@
 # implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import logging as log
 import copy
-
+import logging as log
 from qubell.api.private import exceptions
-from qubell.api.private.organization import OrganizationList, Organization
-
-from qubell.api.provider.router import InstanceRouter, PrivatePath, PublicPath
-
-from qubell.api.tools import lazyproperty
-from qubell.api.private.exceptions import ApiAuthenticationError
-
-# ## Backward compatibility for component testing ##
 from qubell.api.private.common import Auth
+from qubell.api.private.exceptions import ApiAuthenticationError
+from qubell.api.private.organization import OrganizationList, Organization
+from qubell.api.provider.router import InstanceRouter, PrivatePath, PublicPath
+from qubell.api.tools import lazyproperty
 
 Context = Auth
 ####################################################
@@ -58,7 +53,10 @@ class QubellPlatform(InstanceRouter):
         else:
             router = PublicPath(tenant)
             router.public_api_in_use = is_public
-        router.connect(user, password, token)
+
+        if token or (user and password):
+            router.connect(user, password, token)
+
         return QubellPlatform().init_router(router)
 
     def connect_to_another_user(self, user, password, token=None, is_public=False):
@@ -146,3 +144,11 @@ class QubellPlatform(InstanceRouter):
     # noinspection PyMethodMayBeStatic
     def authenticate(self):
         assert False, 'use QubellPlatform.connect instead'
+
+    def generate_session_token(self, refresh_token):
+        response = self._router.generate_session_token(json={'refreshToken': refresh_token})
+        assert response.status_code == 200
+
+        json = response.json()
+
+        return json['jwtBearer'], json['expiresIn']

@@ -379,6 +379,10 @@ class PrivatePath(Router):
         """
         pass
 
+    @route("POST /refreshToken/jwtBearer")
+    def generate_session_token(self, json):
+        pass
+
 
 # TODO: We shouldn't use subclassing to substitute private API for public API. Instead we should
 # TODO: use a flag inside the client to distinguish between APIs and select the approprate methods to call
