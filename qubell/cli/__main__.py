@@ -1,36 +1,35 @@
+import click
+import itertools
 import logging as log
 import os
-from os.path import join, basename
 import re
 import sys
 import time
-import itertools
-
-import click
-from colorama import Fore, Style
 import yaml
-
+from colorama import Fore, Style
+from os.path import join, basename
 from qubell.api.globals import QUBELL, PROVIDER
-from qubell.api.tools import load_env, waitForStatus
+from qubell.api.private.exceptions import NotFoundError
 from qubell.api.private.instance import InstanceList
-from qubell.api.private.platform import QubellPlatform
-from qubell.api.private.exceptions import NotFoundError, ApiError
 from qubell.api.private.manifest import Manifest
+from qubell.api.private.platform import QubellPlatform
 from qubell.api.private.service import system_application_types, CLOUD_ACCOUNT_TYPE
+from qubell.api.tools import load_env, waitForStatus
 from qubell.cli.yamlutils import DuplicateAnchorLoader
 
-
 PROVIDER_CONFIG = None
-CMD_LIST=['instance',
-          'application',
-          'environment',
-          'organization',
-          'platform',
-          'zone',
-          'manifest',]
+CMD_LIST = [
+    'instance',
+    'application',
+    'environment',
+    'organization',
+    'platform',
+    'zone',
+    'manifest',
+    'token',
+]
 
 log.getLogger().setLevel(getattr(log, os.getenv('QUBELL_LOG_LEVEL', 'error').upper()))
-
 
 STATUS_COLORS = {
     "ACTIVE": "GREEN",
@@ -76,38 +75,50 @@ def _map_opt(value_or_none, function):
     else:
         return function(value_or_none)
 
+
 @click.group()
 def platform_cli():
     pass
+
 
 @click.group()
 def zone_cli():
     pass
 
+
 @click.group()
 def organization_cli():
     pass
+
 
 @click.group()
 def application_cli():
     pass
 
+
 @click.group()
 def environment_cli():
     pass
 
+
 @click.group()
 def instance_cli():
     pass
+
 
 @click.group()
 def manifest_cli():
     pass
 
 
+@click.group()
+def token_cli():
+    pass
+
 
 @click.group()
 @click.option("--tenant", default="", help="Tenant url to use, QUBELL_TENANT by default")
+@click.option("--token", default="", help="Session token to use, QUBELL_TOKEN by default")
 @click.option("--user", default="", help="User to use, QUBELL_USER by default")
 @click.option("--password", default="", help="Password to use, QUBELL_PASSWORD by default")
 @click.option("--organization", default="", help="Organization to use, QUBELL_ORGANIZATION by default")
@@ -142,25 +153,38 @@ def entity(ctx, debug, uncolorize, **kwargs):
     class UserContext(object):
         def __init__(self):
             self.platform = None
-            self.colorize = not(uncolorize)
+            self.unauthenticated_platform = None
+            self.colorize = not (uncolorize)
 
         def get_platform(self):
             if not self.platform:
                 assert QUBELL["tenant"], "No platform URL provided. Set QUBELL_TENANT or use --tenant option."
-                assert QUBELL["user"], "No username. Set QUBELL_USER or use --user option."
-                assert QUBELL["password"], "No password provided. Set QUBELL_PASSWORD or use --password option."
+                if not QUBELL["token"]:
+                    assert QUBELL["user"], "No username. Set QUBELL_USER or use --user option."
+                    assert QUBELL["password"], "No password provided. Set QUBELL_PASSWORD or use --password option."
+
                 self.platform = QubellPlatform.connect(
                     tenant=QUBELL["tenant"],
                     user=QUBELL["user"],
-                    password=QUBELL["password"])
+                    password=QUBELL["password"],
+                    token=QUBELL["token"])
             return self.platform
 
+        def get_unauthenticated_platform(self):
+            if not self.unauthenticated_platform:
+                assert QUBELL["tenant"], "No platform URL provided. Set QUBELL_TENANT or use --tenant option."
+
+                self.unauthenticated_platform = QubellPlatform.connect(tenant=QUBELL["tenant"])
+
+            return self.unauthenticated_platform
 
     ctx = click.get_current_context()
     ctx.obj = UserContext()
 
+
 def list_commands(ctx):
     return CMD_LIST
+
 
 def get_command(ctx, name):
     if name.startswith('man'):
@@ -177,14 +201,18 @@ def get_command(ctx, name):
         return zone_cli
     elif name.startswith('pla'):
         return platform_cli
-
-entity.list_commands=list_commands
-entity.get_command=get_command
-
+    elif name.startswith('tok'):
+        return token_cli
 
 
-def _get_platform():
-    return click.get_current_context().obj.get_platform()
+entity.list_commands = list_commands
+entity.get_command = get_command
+
+
+def _get_platform(authenticated=True):
+    context_obj = click.get_current_context().obj
+    return context_obj.get_platform() if authenticated else context_obj.get_unauthenticated_platform()
+
 
 def _color(color, text):
     colorize = click.get_current_context().obj.colorize
@@ -195,6 +223,7 @@ def _color(color, text):
     else:
         return text
 
+
 def _print_message(message, color="BLACK"):
     if "message" in message:
         click.echo(_color(color, message["message"]))
@@ -202,6 +231,7 @@ def _print_message(message, color="BLACK"):
         click.echo(_color(color, message))
     else:
         click.echo(_color(color, "<error format not supported by this version of cli>"))
+
 
 ##############################################################################
 ###############################  APPLICATION  ###############################
@@ -232,6 +262,7 @@ def list_apps(verbose):
                        _color("BLUE", app.name))
         else:
             click.echo(app_id + " " + _color("BLUE", app_name))
+
 
 @application_cli.command(name="export", help="Save manifest of applications to files")
 @click.argument("applications", nargs=-1)
@@ -304,7 +335,8 @@ def export_app(recursive, applications, output_dir, version, stdout):
         do_export(app, version)
 
 
-@application_cli.command(name="import", help="Upload manifest to application. If no name or id provided, application will be created by file name")
+@application_cli.command(name="import",
+                         help="Upload manifest to application. If no name or id provided, application will be created by file name")
 @click.argument("files", nargs=-1)
 @click.option("--category", default=None, help="Category name in which app will be created. "
                                                "If app already exists, its category will be updated.")
@@ -314,7 +346,8 @@ def export_app(recursive, applications, output_dir, version, stdout):
 @click.option("--name", "-n", default=None,
               help="Application name, allowed only if one filename given. Is ignored if --app-id is provided."
                    "Has higher priority than file name.")
-@click.option("--overwrite", "-w", is_flag=True, default=False, help="Upload manifest for already existing applications")
+@click.option("--overwrite", "-w", is_flag=True, default=False,
+              help="Upload manifest for already existing applications")
 def import_app(files, category, overwrite, id, name):
     """ Upload application from file.
 
@@ -382,6 +415,7 @@ def delete_app(applications):
         org.delete_application(app)
         click.echo(_color("GREEN", " OK"))
 
+
 ##############################################################################
 ###############################  ORGANIZATION  ###############################
 ##############################################################################
@@ -403,6 +437,7 @@ def create_org(organization):
         except AssertionError:
             org = platform.get_organization(organization)
             click.echo(_color("YELLOW", org.id) + " still initializing")
+
 
 # TODO: Dup of env.init ??
 @organization_cli.command(name="init", help="Initialize cloud account service")
@@ -426,6 +461,7 @@ def init_ca(account_name, environment, **kwargs):
 
     def type_to_app(t):
         return org.applications[system_application_types.get(t, t)]
+
     env = org.get_environment(environment)
     try:
         cloud_account_service = org.service(
@@ -488,6 +524,7 @@ def list_instances(application, status):
         else:
             def match(f):
                 return lambda s: s.upper() == f.upper()
+
             filters.append(match(status_filter))
     if application:
         application = org.get_application(application)
@@ -497,6 +534,7 @@ def list_instances(application, status):
 
     def list_destroyed_instances():
         return org.list_instances_json(application=application, show_only_destroyed=True)
+
     instance_candidates = \
         InstanceList(list_json_method=list_instances_json,
                      organization=org).init_router(platform._router)
@@ -537,6 +575,7 @@ def _calc_title(items, template="%s (%s)"):
         else:
             value['_title'] = value['id']
 
+
 def _describe_instance(inst, localtime=None):
     click.echo("Instance    %s  %s  %s" % (inst.id, _color("BLUE", inst.name), _color_status(inst.status)))
     app = inst.application
@@ -557,7 +596,7 @@ def _describe_instance(inst, localtime=None):
         _columns(config, lambda o: pad + str(o['_title']), lambda o: pad + str(o['value']))
     if inst.return_values:
         click.echo("Return values: ")
-        endpoints = [{'id': k, 'value':v} for k, v in inst.return_values.iteritems()]
+        endpoints = [{'id': k, 'value': v} for k, v in inst.return_values.iteritems()]
         _calc_title(endpoints)
         _columns(endpoints, lambda o: pad + str(o['_title']), lambda o: str(o['value']))
     if inst.workflowsInfo.get('availableWorkflows', []):
@@ -597,7 +636,7 @@ def _describe_submodules(path, submodules, level):
 @instance_cli.command("launch", help="Launch instance in application")
 @click.option("--revision", default=None, help="Revision to launch")
 @click.option("--environment", default=None, help="Environment used to launch instance")
-@click.option("--destroy", default=60*60, help="Schedule destroy (seconds)")
+@click.option("--destroy", default=60 * 60, help="Schedule destroy (seconds)")
 @click.option("--parameter", default=False, type=(unicode, unicode), multiple=True, help="Parameter value")
 @click.argument("application")
 @click.argument("name", default=None, required=False)
@@ -627,7 +666,7 @@ def launch_instance(revision, environment, destroy, application, name, parameter
             parameters[param_name] = param_value
 
     inst = org.create_instance(application=app, revision=revision, environment=env,
-                               name=name, parameters=parameters, destroyInterval=destroy*1000,
+                               name=name, parameters=parameters, destroyInterval=destroy * 1000,
                                submodules=submodules)
     _describe_instance(inst, True)
 
@@ -697,7 +736,7 @@ def wait_status(instance, status, timeout):
         res = waitForStatus(instance=inst, final=status, accepted=accepted_states, timeout=[timeout * 20, 3, 1])
     finally:
         _describe_instance_short(org.get_instance(instance))
-    if not res: # Exit non-zero if status not reached
+    if not res:  # Exit non-zero if status not reached
         exit(1)
 
 
@@ -747,7 +786,7 @@ def _parse_timestamp(datetime, localtime=False):
 @click.option("--filter-text", default=None, help="Filter by full text, including source and event name")
 @click.option("--max-items", default=30,
               help="Limit number of items to show. Positive integer for tail, negative integer for head.")
-@click.option("--follow", is_flag=True,default=False, help="Wait for new messages to appear.")
+@click.option("--follow", is_flag=True, default=False, help="Wait for new messages to appear.")
 @click.option("--show-all", is_flag=True, default=False, help="Show all messages, overrides --max-items.")
 @click.option("--before", default=None, help="Show messages before TIMESTAMP")
 @click.option("--after", default=None, help="Show messages after TIMESTAMP")
@@ -793,7 +832,7 @@ def show_logs(instance, localtime, severity, sort_by, hide_multiline, filter_tex
             if multiline and not vertical_padding_before and not hide_multiline:
                 click.echo()
             padding = len(time.strftime("%Y-%m-%d %H:%M:%S", time_f(item['time'] / 1000))) + \
-                max_severity_length + max_source_length + max_type_length + 8
+                      max_severity_length + max_source_length + max_type_length + 8
             click.echo(
                 "%s  %s  %s  %s  " % (
                     time.strftime("%Y-%m-%d %H:%M:%S", time_f(item['time'] / 1000)),
@@ -827,6 +866,7 @@ def show_logs(instance, localtime, severity, sort_by, hide_multiline, filter_tex
         else:
             break
 
+
 ##############################################################################
 ###############################  ENVIRONMENT  ###############################
 ##############################################################################
@@ -843,6 +883,7 @@ def list_envs():
             click.echo(" " + _color("BLUE", "DEFAULT"))
         else:
             click.echo()
+
 
 @environment_cli.command("clear", help="Clean environment. Remove all services in environment")
 @click.option("--destroy-services/--keep-services", default=False, help="Destroy services")
@@ -881,7 +922,7 @@ def init_env(environment, without_cloud_account, zone):
     org = platform.get_organization(QUBELL["organization"])
     env = org.get_environment(environment)
     click.echo(env.id + " " + _color("BLUE", env.name) + " ", nl=False)
-    env.init_common_services(with_cloud_account=not(without_cloud_account), zone_name=zone)
+    env.init_common_services(with_cloud_account=not (without_cloud_account), zone_name=zone)
     click.echo(_color("GREEN", "OK"))
 
 
@@ -899,7 +940,7 @@ def create_env(name, init, zone, default, without_cloud_account):
     env = org.create_environment(name, default, zone)
     click.echo(env.id + " " + _color("BLUE", env.name) + " ", nl=False)
     if init:
-        env.init_common_services(with_cloud_account=not(without_cloud_account), zone_name=zone)
+        env.init_common_services(with_cloud_account=not (without_cloud_account), zone_name=zone)
     click.echo(_color("GREEN", "CREATED"))
 
 
@@ -953,6 +994,7 @@ def describe_env(environment):
             except Exception:
                 env_text = ""
             return _color("BLUE", s.name) + " @ " + env_text
+
         _columns(env.services, lambda s: "    " + s.id, service_text)
     if env.policies:
         click.echo("Policies")
@@ -1000,6 +1042,7 @@ def import_env(environment, filename, merge, create):
     env.import_yaml(env_file, merge=merge)
     click.echo(_color("GREEN", "OK"))
 
+
 @environment_cli.command("make-default", help="Set environment as 'default'")
 @click.argument("environment", default='default')
 def make_default(environment):
@@ -1009,6 +1052,7 @@ def make_default(environment):
     click.echo(env.id + " " + _color("BLUE", env.name) + " ", nl=False)
     env.set_as_default()
     click.echo(_color("GREEN", "DEFAULT"))
+
 
 @environment_cli.command("get-keypair", help="Get private key from environment")
 @click.argument("environment", default='default')
@@ -1026,6 +1070,7 @@ def get_keypair(environment, filename):
     else:
         sys.stdout.write(env.get_default_private_key())
 
+
 ##############################################################################
 ###############################  OTHER  ######################################
 ##############################################################################
@@ -1037,6 +1082,7 @@ def list_zones():
     _columns(org.list_zones_json(),
              lambda o: o['id'],
              lambda o: _color("BLUE", o['name']) + (o['isDefault'] and " DEFAULT" or ""))
+
 
 @manifest_cli.command("validate", help="Perform manifest validation")
 @click.argument("filename", required=False, default=None)
@@ -1078,7 +1124,6 @@ REVERSE_MAPPING = {
     'organization': 'QUBELL_ORGANIZATION'
 }
 
-
 REVERSE_PROVIDER_MAPPING = {
     'provider_name': 'PROVIDER_NAME',
     'provider_type': 'PROVIDER_TYPE',
@@ -1107,6 +1152,25 @@ def show_account():
             value = PROVIDER.get(key, None)
             if value:
                 click.echo("export %s='%s'" % (env, value))
+
+
+@token_cli.command('generate', help="Generate a new session token")
+@click.option('--verbose', is_flag=True, default=False, help="Include expiration time into output")
+@click.argument('refresh_token')
+def generate_session_token(refresh_token, verbose):
+    """
+    Generates new session token from the given refresh token.
+    :param refresh_token: refresh token to generate from
+    :param verbose: whether expiration time should be added to output
+    """
+
+    platform = _get_platform(authenticated=False)
+    session_token, expires_in = platform.generate_session_token(refresh_token)
+
+    if verbose:
+        click.echo("%s\n\n%s" % (session_token, _color('YELLOW', "Expires in %d seconds" % expires_in)))
+    else:
+        click.echo(session_token)
 
 
 if __name__ == '__main__':
