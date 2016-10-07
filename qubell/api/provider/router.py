@@ -26,7 +26,7 @@ class Router(object):
 
     @property
     def is_connected(self):
-        return bool((self._cookies and 'PLAY_SESSION' in self._cookies) or self._jwt_auth)
+        return (self._cookies and ('PLAY_SESSION' in self._cookies)) or (self._jwt_auth and (self._jwt_auth.token))
 
     def connect(self, email=None, password=None, token=None):
         token = token or qubell_config['token']

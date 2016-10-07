@@ -46,7 +46,7 @@ class Qubell(object):
         lazy property, to authenticate when needed
         """
         if not cls.__lazy_platform:
-            cls.__lazy_platform = QubellPlatform.connect()
+            cls.__lazy_platform = QubellPlatform.connect(user=qubell_config['user'], password=qubell_config['password'], token=qubell_config['token'])
             log.info('Authentication succeeded.')
         return cls.__lazy_platform
 
