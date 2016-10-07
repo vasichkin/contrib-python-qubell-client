@@ -47,7 +47,7 @@ class RouterDecoratorTests(unittest.TestCase):
 
         @play_auth
         @route("POST /auth")
-        def post_something_privetly(self, cookies): pass
+        def post_something_privetly(self, auth, cookies): pass
 
         @basic_auth
         @route("POST /auth")
@@ -59,7 +59,7 @@ class RouterDecoratorTests(unittest.TestCase):
 
         @play_auth
         @route("GET /simple.json")
-        def get_simple_json(self, cookies): pass
+        def get_simple_json(self, auth, cookies): pass
 
     def setUp(self):
         self.router = self.DummyRouter("http://nowhere.com")
@@ -107,7 +107,8 @@ class RouterDecoratorTests(unittest.TestCase):
         request_mock.return_value = gen_response()
         self.router._cookies = "Big Cake"
         self.router.post_something_privetly()
-        request_mock.assert_called_once_with('POST', 'http://nowhere.com/auth', verify=False, cookies="Big Cake")
+        request_mock.assert_called_once_with(
+            'POST', 'http://nowhere.com/auth', headers=json_header, verify=False, auth=None, cookies="Big Cake")
 
     def test_play_when_cookies_forced(self, request_mock):
         with self.assertRaises(AttributeError) as context:
@@ -139,8 +140,8 @@ class RouterDecoratorTests(unittest.TestCase):
         request_mock.return_value = gen_response()
         self.router._cookies = 'Big Cake'
         self.router.get_simple_json()
-        request_mock.assert_called_once_with('GET', 'http://nowhere.com/simple.json', headers=json_header,
-                                             cookies="Big Cake", verify=False)
+        request_mock.assert_called_once_with(
+            'GET', 'http://nowhere.com/simple.json', headers=json_header, auth=None, cookies="Big Cake", verify=False)
 
     # Error code processing
     #todo: refactor as data driven tests

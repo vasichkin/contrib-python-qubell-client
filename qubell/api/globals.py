@@ -35,6 +35,7 @@ DEFAULT_CLOUD_ACCOUNT_SERVICE = lambda: global_zone_constants.DEFAULT_CLOUD_ACCO
 DEFAULT_SHARED_INSTANCE_CATALOG_SERVICE = lambda: global_zone_constants.DEFAULT_SHARED_INSTANCE_CATALOG_SERVICE
 
 QUBELL = {
+    'token': os.getenv('QUBELL_TOKEN'),
     'user': os.getenv('QUBELL_USER'),
     'password': os.getenv('QUBELL_PASSWORD'),
     'tenant': os.getenv('QUBELL_TENANT', 'http://localhost:9000').rstrip('/'),

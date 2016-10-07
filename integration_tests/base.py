@@ -33,11 +33,12 @@ __license__ = "Apache"
 __email__ = "vkhomenko@qubell.com"
 
 parameters = {
-    'organization': os.getenv('QUBELL_ORGANIZATION', "selfcheck_organization_name"),
-    'user': os.environ['QUBELL_USER'],
-    'pass': os.environ['QUBELL_PASSWORD'],
-    'tenant': os.environ['QUBELL_TENANT'],
-    'provider_name': os.getenv('PROVIDER_NAME', "selfcheck_provider_name"),
+    'organization': os.environ.get('QUBELL_ORGANIZATION', "selfcheck_organization_name"),
+    'user': os.environ.get('QUBELL_USER'),
+    'pass': os.environ.get('QUBELL_PASSWORD'),
+    'tenant': os.environ.get('QUBELL_TENANT'),
+    'token': os.environ.get('QUBELL_TOKEN'),
+    'provider_name': os.environ.get('PROVIDER_NAME', "selfcheck_provider_name"),
     'provider_type': os.environ.get('PROVIDER_TYPE', 'aws-ec2'),
     'provider_identity': os.environ.get('PROVIDER_IDENTITY', 'No PROVIDER_IDENTITY'),
     'provider_credential': os.environ.get('PROVIDER_CREDENTIAL', 'PROVIDER_CREDENTIAL'),
@@ -52,7 +53,7 @@ class BaseTestCase(SetupOnce, unittest.TestCase):
     """
     # Set default manifest for app creation
     manifest = Manifest(file=os.path.join(os.path.dirname(__file__), './default.yml'), name='BaseTestManifest')
-    platform = QubellPlatform.connect(user=parameters['user'], password=parameters['pass'], tenant=parameters['tenant'])
+    platform = QubellPlatform.connect(user=parameters['user'], password=parameters['pass'], tenant=parameters['tenant'], token=parameters['token'])
 
 
     def setup_once(self):
