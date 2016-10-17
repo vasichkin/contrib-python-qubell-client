@@ -5,3 +5,4 @@ nose
 requests
 click
 colorama
+datadog
