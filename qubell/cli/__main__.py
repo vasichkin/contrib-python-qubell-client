@@ -866,6 +866,27 @@ def show_logs(instance, localtime, severity, sort_by, hide_multiline, filter_tex
         else:
             break
 
+@instance_cli.command("runworkflow", help="Run workflow on instance")
+@click.option("--parameter", default=False, type=(unicode, unicode), multiple=True, help="Parameter for workflow run")
+@click.option("--status", is_flag=True, default=False, help="Display instance status after workflow run")
+@click.option("--schedule", default=None, help="Schedule workflow run (seconds)")
+@click.argument("instance")
+@click.argument("workflow")
+def run_workflow(instance, workflow, parameter, status, schedule):
+    platform = _get_platform()
+    org = platform.get_organization(QUBELL["organization"])
+    ins = org.get_instance(instance)
+    parameters = dict()
+
+    for (param_name, param_value) in parameter:
+            parameters[param_name] = param_value
+
+    if schedule:
+        ins.schedule_workflow(name=workflow, timestamp=schedule*1000, parameters=parameters)
+    else:
+        ins.run_workflow(name=workflow, parameters=parameters)
+    if status:
+        _describe_instance(ins, True)
 
 ##############################################################################
 ###############################  ENVIRONMENT  ###############################
