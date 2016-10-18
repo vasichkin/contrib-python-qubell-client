@@ -222,7 +222,7 @@ def publish_results(value):
         from datadog import initialize, api
         now = time.time()
         initialize(api_key=dd_api_key, app_key=dd_app_key)
-        api.Metric.send(metric='monitor.execution_duration.%s' % zone_name, points=(now, value), tags=["stack:dev", "tenant:staging"])
+        api.Metric.send(metric='monitor.execution_duration.%s' % zone_name, points=(now, value), tags=["stack:dev", "tenant:staging", "zone:%s" % zone_name], host="staging.dev.tonomi.com")
 
     if file:
         logging.info('Saving to file: %s' % value)
