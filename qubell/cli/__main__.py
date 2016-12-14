@@ -672,9 +672,11 @@ def launch_instance(revision, environment, destroy, application, name, parameter
 
 
 @instance_cli.command("reconfigure", help="Reconfigure running instance")
+@click.option("--version", default=None, help="Target manifest version")
+@click.option("--revision", default=None, help="Target revision")
 @click.option("--parameter", default=False, type=(unicode, unicode), multiple=True, help="Parameter value")
 @click.argument("instance")
-def reconfigure_instance(instance, parameter):
+def reconfigure_instance(version, revision, instance, parameter):
     platform = _get_platform()
     org = platform.get_organization(QUBELL["organization"])
     inst = org.instances[instance]
@@ -698,20 +700,20 @@ def reconfigure_instance(instance, parameter):
         else:
             parameters[param_name] = param_value
 
-    inst.reconfigure(parameters=parameters, submodules=submodules)
+    inst.reconfigure(parameters=parameters, submodules=submodules, revision=revision, manifestVersion=version)
     _describe_instance(inst, True)
 
 
-@instance_cli.command("reschedule", help="Reschedule destroy workflow for instance")
-@click.option("--destroy", default=60 * 60, help="Destroy interval (seconds) [-1 to disable]")
+@instance_cli.command("reschedule", help="Reschedule workflow for instance")
+@click.option("--workflow", default="destroy", help="Workflow to reschedule.")
+@click.option("--schedule", default=60 * 60, help="Schedule workflow run (seconds) [-1 to disable]")
 @click.argument("instance")
-def reschedule_instance(destroy, instance):
+def reschedule_instance(workflow, schedule, instance):
     platform = _get_platform()
     org = platform.get_organization(QUBELL["organization"])
     inst = org.instances[instance]
-    timestamp = destroy
-    timestamp = destroy * 1000 if destroy != -1
-    inst.reschedule_workflow(workflow_name="destroy", timestamp=timestamp)
+    timestamp = (schedule * 1000) if (schedule != -1) else -1
+    inst.reschedule_workflow(workflow_name=workflow, timestamp=timestamp)
         
 
 @instance_cli.command("parameters", help="Get default launch parameters for application")
