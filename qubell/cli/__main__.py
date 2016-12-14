@@ -671,6 +671,51 @@ def launch_instance(revision, environment, destroy, application, name, parameter
     _describe_instance(inst, True)
 
 
+@instance_cli.command("reconfigure", help="Reconfigure running instance")
+@click.option("--version", default=None, help="Target manifest version")
+@click.option("--revision", default=None, help="Target revision")
+@click.option("--parameter", default=False, type=(unicode, unicode), multiple=True, help="Parameter value")
+@click.argument("instance")
+def reconfigure_instance(version, revision, instance, parameter):
+    platform = _get_platform()
+    org = platform.get_organization(QUBELL["organization"])
+    inst = org.instances[instance]
+    parameters = dict()
+    submodules = dict()
+
+    def _get_module(modules, name):
+        path = name.split(".", 1)
+        module = modules['submodules'].get(path[0], {"submodules": {}, "parameters": {}})
+        modules['submodules'][path[0]] = module
+        if len(path) == 2:
+            return _get_module(module, path[1])
+        else:
+            return module
+
+    for (param_name, param_value) in parameter:
+        if ":" in param_name:
+            (module_name, module_param_name) = param_name.split(":", 1)
+            module = _get_module({'submodules': submodules}, module_name)
+            module['parameters'][module_param_name] = param_value
+        else:
+            parameters[param_name] = param_value
+
+    inst.reconfigure(parameters=parameters, submodules=submodules, revision=revision, manifestVersion=version)
+    _describe_instance(inst, True)
+
+
+@instance_cli.command("reschedule", help="Reschedule workflow for instance")
+@click.option("--workflow", default="destroy", help="Workflow to reschedule.")
+@click.option("--schedule", default=60 * 60, help="Schedule workflow run (seconds) [-1 to disable]")
+@click.argument("instance")
+def reschedule_instance(workflow, schedule, instance):
+    platform = _get_platform()
+    org = platform.get_organization(QUBELL["organization"])
+    inst = org.instances[instance]
+    timestamp = (schedule * 1000) if (schedule != -1) else -1
+    inst.reschedule_workflow(workflow_name=workflow, timestamp=timestamp)
+        
+
 @instance_cli.command("parameters", help="Get default launch parameters for application")
 @click.argument("application")
 def show_instance_parameters(application):
