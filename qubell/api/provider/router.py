@@ -479,6 +479,18 @@ class PublicPath(PrivatePath):
     def api1_instance_run_workflow(self, instance_id, workflow, auth, json): pass
 
     @basic_auth
+    @route("POST /api/1/instances/{instance_id}/{workflow}/schedule")
+    def api1_instance_schedule_workflow(self, instance_id, workflow, auth, json): pass
+
+    @basic_auth
+    @route("POST /api/1/instances/{instance_id}/{workflow}/reschedule")
+    def api1_instance_reschedule_workflow(self, instance_id, workflow, auth, json): pass
+
+    @basic_auth
+    @route("PUT /api/1/instances/{instance_id}/configuration")
+    def api1_instance_reconfigure(self, instance_id, auth, json): pass
+
+    @basic_auth
     @route("PUT /api/1/instances/{instance_id}/userData")
     def api1_instance_set_user_data(self, instance_id, json, auth): pass
 
