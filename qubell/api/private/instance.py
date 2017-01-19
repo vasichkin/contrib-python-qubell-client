@@ -256,6 +256,9 @@ class Instance(Entity, ServiceMixin, InstanceRouter):
         # noinspection PyAttributeOutsideInit
         self.__last_read_time = time.time()
         self.__cached_json = self._router.get_instance(org_id=self.organizationId, instance_id=self.instanceId).json()
+
+        res = self._router.get_instance_workflowhistory(org_id=self.organizationId, instance_id=self.instanceId).json()
+        self.__cached_json['workflowsInfo'] = res
         return self.__cached_json
 
     @staticmethod

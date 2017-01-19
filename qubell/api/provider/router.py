@@ -211,6 +211,10 @@ class PrivatePath(Router):
     def get_instance_activitylog(self, org_id, instance_id, auth, cookies, params=None, ctype=".json"): pass
 
     @play_auth
+    @route("GET /organizations/{org_id}/instances/{instance_id}/jobs{ctype}")
+    def get_instance_workflowhistory(self, org_id, instance_id, cookies, ctype=".json"): pass
+
+    @play_auth
     @route("POST /organizations/{org_id}/instances/{instance_id}/{action}{ctype}")
     def post_instance_action(self, org_id, instance_id, action, auth, cookies, data="{}", ctype=".json"): pass
 
