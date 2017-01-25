@@ -214,9 +214,29 @@ class Instance(Entity, ServiceMixin, InstanceRouter):
         elif key in ['workflowHistory', 'scheduledWorkflows', 'availableWorkflows']:
             log.debug('Getting instance workflow attribute: %s' % key)
             j = self.json()
-            old_api_value = j.get(key)
-            new_api_value = j.get('workflowsInfo', {}).get(key, False)
+
+            old_api_value = j.get('workflowsInfo', {}).get(key, False)
+
+            if not old_api_value :
+                new_workflowsInfo = self._router.get_instance_workflowhistory(org_id=self.organizationId, instance_id=self.instanceId).json()
+                new_api_value = new_workflowsInfo.get(key, False)
+            else:
+                new_api_value = False
+
             atr = new_api_value or old_api_value or []
+            log.debug(atr)
+            return atr
+        elif key == 'workflowsInfo':
+            log.debug('Getting instance attribute: %s' % key)
+            j = self.json()
+            old_api_value = j.get('workflowsInfo', False)
+
+            if not old_api_value:
+                new_api_value =  self._router.get_instance_workflowhistory(org_id=self.organizationId, instance_id=self.instanceId).json()
+            else:
+                new_api_value = False
+
+            atr = new_api_value or old_api_value or {}
             log.debug(atr)
             return atr
         else:
@@ -257,8 +277,6 @@ class Instance(Entity, ServiceMixin, InstanceRouter):
         self.__last_read_time = time.time()
         self.__cached_json = self._router.get_instance(org_id=self.organizationId, instance_id=self.instanceId).json()
 
-        res = self._router.get_instance_workflowhistory(org_id=self.organizationId, instance_id=self.instanceId).json()
-        self.__cached_json['workflowsInfo'] = res
         return self.__cached_json
 
     @staticmethod
@@ -407,9 +425,9 @@ class Instance(Entity, ServiceMixin, InstanceRouter):
     def reconfigure(self, revision=None, parameters=None, submodules=None, manifestVersion=None):
         # if no parameters are specified, use an alternative, more concise API route
         if not revision \
-           and parameters is None \
-           and not submodules \
-           and not manifestVersion:
+                and parameters is None \
+                and not submodules \
+                and not manifestVersion:
             resp = self._router.post_instance_reconfigure(org_id=self.organizationId, instance_id=self.instanceId)
             return resp.json()
 
