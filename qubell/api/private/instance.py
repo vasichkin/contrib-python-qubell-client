@@ -192,17 +192,6 @@ class Instance(Entity, ServiceMixin, InstanceRouter):
         else:  # <v39 - dict  todo: remove when 39+ is wide in production
             return parameters
 
-    @property
-    def currentWorkflow(self):
-        j = self.json()
-        #TODO: FIXME: get rid of old API when its support will be removed
-        # We could get {} or None for both together. Dependant code expects dict(), so, returning dict.
-        if j.get('currentWorkflow', {}):
-            return j.get('currentWorkflow', {})
-        elif j.get('workflowsInfo', {}).get('currentWorkflow', {}):
-            return j.get('workflowsInfo', {}).get('currentWorkflow', {})
-        else:
-            return {}
 
     def __getattr__(self, key):
         if key in ['instanceId', ]:
@@ -518,11 +507,6 @@ class Instance(Entity, ServiceMixin, InstanceRouter):
                 return time.gmtime(t/1000)
             return None
         try:
-            if self.currentWorkflow:
-                cw_started_at = self.currentWorkflow.get('startedAt')
-                if cw_started_at:
-                    return parse_time(cw_started_at)
-
             max_wf_started_at = max([i.get('startedAt') for i in self.workflowHistory])
             return parse_time(max_wf_started_at)
         except ValueError:
