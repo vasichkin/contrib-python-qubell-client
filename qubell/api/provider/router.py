@@ -212,7 +212,7 @@ class PrivatePath(Router):
 
     @play_auth
     @route("GET /organizations/{org_id}/instances/{instance_id}/jobs{ctype}")
-    def get_instance_workflowhistory(self, org_id, instance_id, cookies, ctype=".json"): pass
+    def get_instance_workflowhistory(self, org_id, instance_id, auth, cookies, ctype=".json"): pass
 
     @play_auth
     @route("POST /organizations/{org_id}/instances/{instance_id}/{action}{ctype}")
