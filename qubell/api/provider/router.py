@@ -467,6 +467,10 @@ class PublicPath(PrivatePath):
     def api1_instance_details(self, instance_id, auth): pass
 
     @basic_auth
+    @route("GET /api/1/instances/{instance_id}/schedules")
+    def api1_instance_scheduled_workflows(self, instance_id, auth): pass
+
+    @basic_auth
     @route("DELETE /api/1/instances/{instance_id}")
     def api1_instance_delete(self, instance_id, auth, params): pass
 
