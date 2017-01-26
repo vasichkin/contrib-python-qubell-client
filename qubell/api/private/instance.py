@@ -192,17 +192,6 @@ class Instance(Entity, ServiceMixin, InstanceRouter):
         else:  # <v39 - dict  todo: remove when 39+ is wide in production
             return parameters
 
-    @property
-    def currentWorkflow(self):
-        j = self.json()
-        #TODO: FIXME: get rid of old API when its support will be removed
-        # We could get {} or None for both together. Dependant code expects dict(), so, returning dict.
-        if j.get('currentWorkflow', {}):
-            return j.get('currentWorkflow', {})
-        elif j.get('workflowsInfo', {}).get('currentWorkflow', {}):
-            return j.get('workflowsInfo', {}).get('currentWorkflow', {})
-        else:
-            return {}
 
     def __getattr__(self, key):
         if key in ['instanceId', ]:
@@ -214,9 +203,29 @@ class Instance(Entity, ServiceMixin, InstanceRouter):
         elif key in ['workflowHistory', 'scheduledWorkflows', 'availableWorkflows']:
             log.debug('Getting instance workflow attribute: %s' % key)
             j = self.json()
-            old_api_value = j.get(key)
-            new_api_value = j.get('workflowsInfo', {}).get(key, False)
+
+            old_api_value = j.get('workflowsInfo', {}).get(key, False)
+
+            if not old_api_value :
+                new_workflowsInfo = self._router.get_instance_workflowhistory(org_id=self.organizationId, instance_id=self.instanceId).json()
+                new_api_value = new_workflowsInfo.get(key, False)
+            else:
+                new_api_value = False
+
             atr = new_api_value or old_api_value or []
+            log.debug(atr)
+            return atr
+        elif key == 'workflowsInfo':
+            log.debug('Getting instance attribute: %s' % key)
+            j = self.json()
+            old_api_value = j.get('workflowsInfo', False)
+
+            if not old_api_value:
+                new_api_value =  self._router.get_instance_workflowhistory(org_id=self.organizationId, instance_id=self.instanceId).json()
+            else:
+                new_api_value = False
+
+            atr = new_api_value or old_api_value or {}
             log.debug(atr)
             return atr
         else:
@@ -256,6 +265,7 @@ class Instance(Entity, ServiceMixin, InstanceRouter):
         # noinspection PyAttributeOutsideInit
         self.__last_read_time = time.time()
         self.__cached_json = self._router.get_instance(org_id=self.organizationId, instance_id=self.instanceId).json()
+
         return self.__cached_json
 
     @staticmethod
@@ -404,9 +414,9 @@ class Instance(Entity, ServiceMixin, InstanceRouter):
     def reconfigure(self, revision=None, parameters=None, submodules=None, manifestVersion=None):
         # if no parameters are specified, use an alternative, more concise API route
         if not revision \
-           and parameters is None \
-           and not submodules \
-           and not manifestVersion:
+                and parameters is None \
+                and not submodules \
+                and not manifestVersion:
             resp = self._router.post_instance_reconfigure(org_id=self.organizationId, instance_id=self.instanceId)
             return resp.json()
 
@@ -497,11 +507,6 @@ class Instance(Entity, ServiceMixin, InstanceRouter):
                 return time.gmtime(t/1000)
             return None
         try:
-            if self.currentWorkflow:
-                cw_started_at = self.currentWorkflow.get('startedAt')
-                if cw_started_at:
-                    return parse_time(cw_started_at)
-
             max_wf_started_at = max([i.get('startedAt') for i in self.workflowHistory])
             return parse_time(max_wf_started_at)
         except ValueError:
