@@ -467,6 +467,10 @@ class PublicPath(PrivatePath):
     def api1_instance_details(self, instance_id, auth): pass
 
     @basic_auth
+    @route("GET /api/1/instances/{instance_id}/schedules")
+    def api1_instance_scheduled_workflows(self, instance_id, auth): pass
+
+    @basic_auth
     @route("DELETE /api/1/instances/{instance_id}")
     def api1_instance_delete(self, instance_id, auth, params): pass
 
@@ -477,6 +481,18 @@ class PublicPath(PrivatePath):
     @basic_auth
     @route("POST /api/1/instances/{instance_id}/{workflow}")
     def api1_instance_run_workflow(self, instance_id, workflow, auth, json): pass
+
+    @basic_auth
+    @route("POST /api/1/instances/{instance_id}/{workflow}/schedule")
+    def api1_instance_schedule_workflow(self, instance_id, workflow, auth, json): pass
+
+    @basic_auth
+    @route("POST /api/1/instances/{instance_id}/{workflow}/reschedule")
+    def api1_instance_reschedule_workflow(self, instance_id, workflow, auth, json): pass
+
+    @basic_auth
+    @route("PUT /api/1/instances/{instance_id}/configuration")
+    def api1_instance_reconfigure(self, instance_id, auth, json): pass
 
     @basic_auth
     @route("PUT /api/1/instances/{instance_id}/userData")
