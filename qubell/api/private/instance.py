@@ -200,15 +200,22 @@ class Instance(Entity, ServiceMixin, InstanceRouter):
             log.debug('Checking instance status')
             return self.ready()
         #TODO: FIXME: old API support: remove when its support will be removed on server
-        elif key in ['workflowHistory', 'scheduledWorkflows', 'availableWorkflows']:
+
+        elif key in ['scheduledWorkflows', 'availableWorkflows']:
+            log.debug('Getting instance workflow attribute: %s' % key)
+            j = self.json()
+            api_value = j.get('workflowsInfo', {}).get(key, False)
+            atr = api_value or []
+            log.debug(atr)
+            return atr
+        elif key == 'workflowHistory':
             log.debug('Getting instance workflow attribute: %s' % key)
             j = self.json()
 
             old_api_value = j.get('workflowsInfo', {}).get(key, False)
 
             if not old_api_value :
-                new_workflowsInfo = self._router.get_instance_workflowhistory(org_id=self.organizationId, instance_id=self.instanceId).json()
-                new_api_value = new_workflowsInfo.get(key, False)
+                new_api_value = self._router.get_instance_workflowhistory(org_id=self.organizationId, instance_id=self.instanceId).json()
             else:
                 new_api_value = False
 
@@ -218,16 +225,16 @@ class Instance(Entity, ServiceMixin, InstanceRouter):
         elif key == 'workflowsInfo':
             log.debug('Getting instance attribute: %s' % key)
             j = self.json()
-            old_api_value = j.get('workflowsInfo', False)
+            api_value = j.get('workflowsInfo', False)
+            old_workflowHistory = api_value.get('workflowHistory', False)
 
-            if not old_api_value:
-                new_api_value =  self._router.get_instance_workflowhistory(org_id=self.organizationId, instance_id=self.instanceId).json()
-            else:
-                new_api_value = False
+            if not old_workflowHistory:
+                api_value['workflowHistory'] = self._router.get_instance_workflowhistory(org_id=self.organizationId, instance_id=self.instanceId).json()
 
-            atr = new_api_value or old_api_value or {}
+            atr = api_value or {}
             log.debug(atr)
             return atr
+
         else:
             log.debug('Getting instance attribute: %s' % key)
             atr = self.json()[key]
