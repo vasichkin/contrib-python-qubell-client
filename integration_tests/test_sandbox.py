@@ -20,6 +20,7 @@ __version__ = "1.0.1"
 __email__ = "vkhomenko@qubell.com"
 
 import os
+import time
 
 from qubell.api.testing import *
 
@@ -56,6 +57,7 @@ class SandboxClassTest(BaseComponentTestCase):
         assert instance in app.instances
 
     def test_env(self):
+        time.sleep(20) # Let some time for env to be updated
         default_env = self.organization.environments['default'].json()
         custom_env = self.organization.environments['custom'].json()
 
