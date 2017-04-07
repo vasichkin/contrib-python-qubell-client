@@ -6,7 +6,7 @@ python:
 env:
   global:
     # TENANT (Staging)
-    - secure: "dBbS72p0nTzLZMlz344rFjRdt1D3smVRbFSwwG59OnmmziIK10pdRq0Rh3TEiUKJvFv30hncb/BiJQ7Gr1y1lT+igEd+JnguEfYWY2j0Qv5vmlBkY8nnyX1w6UQqexaSC0dsd9ZBpqDDAERVSsBl26+tuofcupjyZznWL9k3pC
+    - secure: "dBbS72p0nTzLZMlz344rFjRdt1D3smVRbFSwwG59OnmmziIK10pdRq0Rh3TEiUKJvFv30hncb/BiJQ7Gr1y1lT+igEd+JnguEfYWY2j0Qv5vmlBkY8nnyX1w6UQqexaSC0dsd9ZBpqDDAERVSsBl26+tuofcupjyZznWL9k3pC"
     #- secure: "QcSqX5RpgSMg+N5c0MbTbAKBFyFrc7EwBVbaB7Hy9OXM/+MGNWfyxMuhvMCfo5isZ3uLdXnNGE920not0i5dTiRDvSr1ugjRpqtaYHkqgNlUCFU4zDVQl71kTxfzEiafqxKzxCnk7QPal/AZ/WZyy/Sjs4PyOi/XOH6dp4NVgB4="
     - secure: "GSIjKuNLmR5Ml5hW8puACRBMnblwdYxiVvpmbS4s9pmhMhzXFUY7OtIraO4vx8sVQ6LO0+ob3SAGva7zUhXMMBetzdej6TDMjVQdzhfvx1l/MPQ//cwTEHXViplK23uqeMvZ1z5e5Gklra4sY5fpaPKz0mCedL/owsae4JxoRPE="
     - secure: "H8IloaOJMK9T7WmIxEMxGFJx9DmIykITrRE0Q6388q9CDWhnvLYud6hy6bylBvLKm1Gx7ESoB10JmZpZer5LteqCVRV1mFXHX/ABORQuec8Mht8CoCHzk79HGES40riIbjP4jnFor6ntBsn7nLHH5kJTWChmnq2xFrH3t3++rXY="
