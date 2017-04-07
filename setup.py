@@ -14,7 +14,7 @@ test_requires = [
     ]
 
 setup(name='qubell-api-python-client',
-      version='1.62.47.31',  # versionising: <major>.<minor>.<platform major>.<platform minor>
+      version='1.63.47.43',  # versionising: <major>.<minor>.<platform major>.<platform minor>
       description='Qubell platform client library',
       long_description=open(os.path.join(here,'README')).read(),
       author='Vasyl Khomenko',
