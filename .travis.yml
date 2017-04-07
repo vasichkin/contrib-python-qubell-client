@@ -4,11 +4,12 @@ python:
   - '2.7'
   #- '3.3' //todo: need plenty of improvements https://travis-ci.org/qubell/contrib-python-qubell-client/jobs/21157898
 env:
-  global:
-    - secure: "QcSqX5RpgSMg+N5c0MbTbAKBFyFrc7EwBVbaB7Hy9OXM/+MGNWfyxMuhvMCfo5isZ3uLdXnNGE920not0i5dTiRDvSr1ugjRpqtaYHkqgNlUCFU4zDVQl71kTxfzEiafqxKzxCnk7QPal/AZ/WZyy/Sjs4PyOi/XOH6dp4NVgB4="
-    - secure: "GSIjKuNLmR5Ml5hW8puACRBMnblwdYxiVvpmbS4s9pmhMhzXFUY7OtIraO4vx8sVQ6LO0+ob3SAGva7zUhXMMBetzdej6TDMjVQdzhfvx1l/MPQ//cwTEHXViplK23uqeMvZ1z5e5Gklra4sY5fpaPKz0mCedL/owsae4JxoRPE="
-    - secure: "H8IloaOJMK9T7WmIxEMxGFJx9DmIykITrRE0Q6388q9CDWhnvLYud6hy6bylBvLKm1Gx7ESoB10JmZpZer5LteqCVRV1mFXHX/ABORQuec8Mht8CoCHzk79HGES40riIbjP4jnFor6ntBsn7nLHH5kJTWChmnq2xFrH3t3++rXY="
-    - secure: "JIgZlbWD1CkgoHvpSclMyiVaRBCOWnR0UtZgI1DuZWEp7fgphEDiWAYadEf+WVBfy6N6038f82xLMNqopx2sNdNsIYX9867WiWjWKd9j5tiiqIQ1Gb6lYv9t+33rbzxy/ZfR1/1RAYLU1J7AtB+vvvB/8d5v+sQMkSRarlVEsTg="
+  global: 
+    # Tenant (staging), Org (travis), User (tester), Password (default)
+    - secure: "FiW9o9NuezfPEOI/8aoo48pEO2wdB7WMfrh9gSLTljDMEZ+stH3SoH3mLk1SPCb6veq+QWiyLoP2kNd2I4ump3WQf+zG6oj2uj3F6iE6uM6hqpyNoqNg3bWUIImKK/E146brlxZJciIzeyM7A3QQ6YvYzDPEGGUUrWnQbJyVsx0="
+    - secure: "fFppeOYg7fUbOjpYJtsN6QfOvuB9+mbez9HdGJTryLmLuAbLXTHXSyCitNKIcY/tZL8Tup/ZvogxjwZcaQAuM3C2pJSyZbNz7eLvOCezBwNAaVfkCuPNd7SkTKA7JU6TJ4p3Xon+yZ6w0Km3CACjjzuPZg0BvJgmNkuQ4Juw0bI="
+    - secure: "P/Ys/UJCRWewlk49QMOk/07j1N6MvPPdhsOoY4p2uSHbOroST8V7cl0hGNMCG41Rv/KMLZw/HbIISWdX+d41cjj3JJLIPwEXxB6kHLAhRhGuAqMd0O3IaoEh/o6GCKxSD8VoNVCMsnqL4/lU7Uq89uzZf2EklKEhwrwVxdRHEjY="
+    - secure: "TZevB1ovpB/wPkJ9D1+Mkg4okM5NCkBkbFNqn1egv1XH2u1PUsk5dNZFP7Om4XP2o45fm+JGbfOt1SuwckOhPlaFYim09NkjiE0kZjup8l0b8EMjG/gKsydNk0rN+2HCyiOfjPpxJ+C7G59W/PgvUwAGTzeLwHimGnPWSmasThU="
 install:
  - pip install -r requirements.txt
  - pip install pylint
